@@ -1,7 +1,5 @@
 local Help = {}
 
--- params: {path: String, name: String}
--- return: String
 function Help:make_path(path, name)
   if (vim.endswith(path, "/")) then
     return path..name
@@ -9,8 +7,6 @@ function Help:make_path(path, name)
   return path.."/"..name
 end
 
--- params: {path: String}
--- return: String
 function Help:get_file_name(path)
   local index = #path - 1
 
@@ -25,8 +21,24 @@ function Help:get_file_name(path)
   return string.sub(path, index + 1)
 end
 
--- params: {path: String}
--- return: String
+function Help:get_file_extension(name)
+  local index = #name - 1
+
+  while (index > 1) do
+    if (string.sub(name, index, index) == '.') then
+      break
+    end
+
+    index = index - 1
+  end
+
+  if (index == 1) then
+    return ""
+  end
+
+  return string.sub(name, index + 1)
+end
+
 function Help:get_file_parent(path)
   local index = #path - 1
 
@@ -44,20 +56,35 @@ function Help:get_file_parent(path)
   return string.sub(path, 0, index - 1)
 end
 
--- params: {path: String}
--- return: Boolean
 function Help:file_exists(path)
   return not(vim.fn.getftype(path) == "")
 end
 
--- params: {msg: String, def: Boolean}
--- return: Boolean
+function Help:get_file_type(path)
+  -- TODO
+  local type = vim.fn.getftype(path)
+  if (type == "dir") then
+    return "directory"
+  elseif (type == "bdev") then
+    return "block"
+  elseif (type == "cdev") then
+    return "char"
+  end
+  return type
+end
+
+function Help:copy_file(src, dst)
+  -- TODO: better copy
+  local content = vim.fn.readfile(src, "b")
+  vim.fn.writefile(content, dst, "b")
+end
+
 -- NOTE: if def is true then default is 'yes', otherwise 'no'
 function Help:get_user_yesno(msg, def)
   if (def) then
-    msg = msg.." [Y/n]"
+    msg = msg.." [Y/n] "
   else
-    msg = msg.." [y/N]"
+    msg = msg.." [y/N] "
   end
   local str = vim.fn.input({prompt = msg, default = "", cancelreturn = ""})
   if (vim.stricmp(str, "y") == 0 or vim.stricmp(str, "yes") == 0) then
@@ -68,7 +95,6 @@ function Help:get_user_yesno(msg, def)
   return def
 end
 
--- params: {msg: String, def: String}
 function Help:get_user_input(msg, def)
   local str = vim.fn.input({prompt = msg..": ", default = (def or ""), cancelreturn = ""})
   return str

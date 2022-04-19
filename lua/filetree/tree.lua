@@ -3,10 +3,10 @@ local Tree = Node:inherit()
 
 local Help = require("filetree.help")
 
--- params: {conf: Table, path: String, parent: Tree, depth: Number, name: String, type: String}
--- return: Tree
-function Tree:new(conf, path, parent, depth, name, type)
-  local self = setmetatable(Node:new(conf, path, parent, depth, name, type), { __index = Tree })
+---@param conf  table with options {option = value, ...}. |filetree-config|
+---@returns Tree metatable
+function Tree:new(conf, name, path, parent, depth, type)
+  local self = setmetatable(Node:new(conf, name, path, parent, depth, type), { __index = Tree })
   self.children = {}
   self.loaded = false
   self.expanded = false
@@ -15,17 +15,17 @@ end
 
 function Tree:expand()
   if (self.loaded) then
-    local new_time = vim.fn.getftime(self.path)
-    if (new_time > self.cache.time) then
-      self:reload()
-    end
+    --local new_time = vim.fn.getftime(self.path)
+    --if (new_time > self.cache.time) then
+    --  self:reload()
+    --end
   else
     self:reload()
   end
   self.expanded = true
 end
 
--- params: {recursive: Boolean}
+---@param recursive  close children if true
 function Tree:close(recursive)
   if (recursive) then
     self:close_recursive()
@@ -37,7 +37,7 @@ end
 function Tree:close_recursive()
   self.expanded = false
   for i, node in ipairs(self.children) do
-    if (node.rtype == "dir") then
+    if (node.rtype == "directory") then
       node:close_recursive()
     end
   end
@@ -45,47 +45,59 @@ end
 
 function Tree:reload()
   self.children = {}
-  local files = vim.fn.glob(self.path.."/*", false, true)
-  local hidden_files = vim.fn.glob(self.path.."/.*", false, true)
-  vim.list_extend(files, hidden_files)
-  self:load_files(files)
+
+  local dir, err, err_name = vim.loop.fs_opendir(self.path, nil, 4000)
+  if (err ~= nil) then
+    print("failed to open directory:", err)
+    return err_name
+  end
+
+  local files, err, err_name = vim.loop.fs_readdir(dir)
+  if (err ~= nil) then
+    print("failed to read directory:", err)
+    return err_name
+  end
+
+  vim.loop.fs_closedir(dir)
+
+  if (files ~= nil) then
+    for i, file in ipairs(files) do
+      local path = Help:make_path(self.path, file.name)
+      if (not(file.name == ".") and not(file.name == "..")) then
+        table.insert(self.children, self:create_node(file.name, path, file.type))
+      end
+    end
+  end
+
   self:sort()
+  self.loaded = true
 end
 
 function Tree:sort()
   -- TODO: config
   table.sort(self.children, function(a, b)
-    if (a.rtype == "dir" and not(b.rtype == "dir")) then
+    if (a.rtype == "directory" and not(b.rtype == "directory")) then
       return true
-    elseif (b.rtype == "dir" and not(a.rtype == "dir")) then
+    elseif (b.rtype == "directory" and not(a.rtype == "directory")) then
       return false
     end
     return (string.upper(a.name) < string.upper(b.name))
   end)
 end
 
--- params: {files: Table{String ...}}
-function Tree:load_files(files)
-  for i, path in ipairs(files) do
-    local name = Help:get_file_name(path)
-    if (not(name == ".") and not(name == "..")) then
-      table.insert(self.children, self:create_node(path, name, vim.fn.getftype(path)))
-    end
-  end
-  self.loaded = true
-end
-
--- params: {node: Node}
+---@param node  add Node metatable to children
 function Tree:add_node(node)
   table.insert(self.children, node)
 end
 
--- params: {path: String}
+---@param node  add Node metatable with path to children
 function Tree:add_file(path)
-  table.insert(self.children, self:create_node(path, Help:get_file_name(path), vim.fn.getftype(path)))
+  local node = self:create_node(Help:get_file_name(path), path, Help:get_file_type(path))
+  table.insert(self.children, node)
+  return node
 end
 
--- params: {node: Node}
+---@param node  remove Node metatable from children
 function Tree:remove_node(node)
   local index = 0
   for i, child in ipairs(self.children) do
@@ -100,15 +112,17 @@ function Tree:remove_node(node)
   end
 end
 
--- params: {path: String, name: String, type: String}
--- return: Node
-function Tree:create_node(path, name, type)
-  if (type == "dir") then
-    return Tree:new(self.config, path, self, self.depth + 1, name, type)
-  elseif (type == "link" and vim.fn.getftype(vim.fn.resolve(path)) == "dir") then
-    return Tree:new(self.config, path, self, self.depth + 1, name, type)
+---@param name  file name
+---@param path  file path
+---@param type  file type
+---@returns Tree metatable if type is directory or link pointing to a directory, else Node metatable
+function Tree:create_node(name, path, type)
+  if (type == "directory") then
+    return Tree:new(self.config, name, path, self, self.depth + 1, type)
+  elseif (type == "link" and Help:get_file_type(vim.fn.resolve(path)) == "directory") then
+    return Tree:new(self.config, name, path, self, self.depth + 1, type)
   end
-  return Node:new(self.config, path, self, self.depth + 1, name, type)
+  return Node:new(self.config, name, path, self, self.depth + 1, type)
 end
 
 return Tree

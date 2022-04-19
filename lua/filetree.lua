@@ -1,12 +1,16 @@
 local FileTree = {}
 
 local View = require("filetree.view")
-local NodeView = require("filetree.view.node")
 local Mapping = require("filetree.mapping")
+local NodeView = require("filetree.view.node")
 local Tree = require("filetree.tree")
+local Help = require("filetree.help")
 
--- params: {conf: Table}
--- return: FileTree
+FileTree.View = View
+FileTree.Mapping = Mapping
+
+---@param conf  table with options {option = value, ...}. |filetree-config|
+---@returns FileTree metatable
 function FileTree:new(conf)
   local self = setmetatable({}, { __index = FileTree })
   self.config = (conf or {})
@@ -19,7 +23,6 @@ function FileTree:new(conf)
   self.view:setup_highlight()
   self.view:setup_config()
   self.view:setup_buffer()
-  self.view:setup_window()
 
   self.mapping:setup_config()
   self.mapping:setup_mappings()
@@ -36,8 +39,7 @@ function FileTree:new(conf)
     end
   end
   self:load_extensions()
-
-  _G.filetree = self
+  self:load_tree()
   return self
 end
 
@@ -45,19 +47,19 @@ function FileTree:setup_config()
   local conf = self.config
   conf.directory = (conf.directory or vim.fn.getcwd())
   conf.node = (conf.node or {})
-  conf.node.init = (conf.node.init or function(node) self:node_init_callback(node) end)
+  conf.node.init_callback = (conf.node.init_callback or function(node) self:node_init_callback(node) end)
 end
 
 function FileTree:load_tree()
   vim.fn.cursor(1, 0)
-  self.view:begin_render()
-  self.tree = Tree:new(self.config.node, self.config.directory, nil, 0)
+  local file_name = Help:get_file_name(self.config.directory)
+  local file_type = Help:get_file_type(self.config.directory)
+  self.tree = Tree:new(self.config.node, file_name, self.config.directory, nil, 0, file_type)
   self.view:set_tree(self.tree)
   self.tree:reload()
-  self.view:redraw()
 end
 
--- params: {node: Node}
+---@param node  Node metatable
 function FileTree:node_init_callback(node)
   node.open = function(node)
     self:open_file(node.path)
@@ -67,12 +69,10 @@ function FileTree:node_init_callback(node)
     node.parent:remove_node(node)
   end
 
-  node:update_cache()
   node.view = NodeView:new(node)
-  self.view:render_node(node)
 end
 
--- params: {file: String}
+---@param file  file to open in editor
 function FileTree:open_file(file)
   if (not(self.config.file_callback == nil)) then
     self.config.file_callback(file)
@@ -100,7 +100,8 @@ function FileTree:load_extensions()
   end
 end
 
--- params: {name: String, conf: Table}
+---@param name  extension name
+---@param conf  table with options {option = value, ...}. |filetree-config|
 function FileTree:enable_extension(name, conf)
   if (name == "icons") then
     local ExtIcons = require("filetree.extensions.icons")
@@ -116,15 +117,20 @@ end
 
 -- ### Getters and setters ### ---
 
--- return: String
+---@returns path to root tree
 function FileTree:get_directory()
   return self.config.directory
 end
 
--- params: {path: String}
+---@param path  new root directory path
 function FileTree:set_directory(path)
   self.config.directory = path
   vim.cmd("augroup filetree | doautocmd User dir_changed | augroup END")
+end
+
+---@param conf  table with options {option = value, ...}. |filetree-config|
+function FileTree:setup(conf)
+  _G.filetree = FileTree:new(conf)
 end
 
 return FileTree

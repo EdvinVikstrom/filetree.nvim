@@ -1,8 +1,8 @@
 local Extension = require("filetree.extension")
 local ExtIcons = Extension:inherit()
 
--- params: {conf: Table}
--- return: ExtIcons
+---@param conf  table with options {option = value, ...}. |filetree-config|
+---@returns ExtIcons metatable
 function ExtIcons:new(conf)
   local self = setmetatable(Extension:new("icons", conf), { __index = ExtIcons })
   return self
@@ -22,13 +22,13 @@ end
 function ExtIcons:setup_config()
 end
 
--- params: {filetree: FileTree}
+---@param filetree  FileTree metatable
 function ExtIcons:init(filetree)
   self.render_callback = self:setup_render_callback(filetree)
   filetree.view.config.render_callback = self.render_callback
 end
 
--- params: {filetree: FileTree}
+---@param filetree  FileTree metatable
 function ExtIcons:setup_render_callback(filetree)
   return function(view, nview)
     view:render_callback(nview)
@@ -47,10 +47,10 @@ end
 
 -- ### static functions ### --
 
--- params: {node: Node}
--- return: Table{symbol: String, hl: Table}
+---@param node  Node metatable
+---@returns table {symbol: String, hl: Table}
 function ExtIcons:get_icon(node)
-  if (node.rtype == "dir") then
+  if (node.rtype == "directory") then
     if (node.type == "link") then
       if (node.expanded) then return self.icons.link_dir_open else return self.icons.link_dir end
     else
@@ -59,7 +59,7 @@ function ExtIcons:get_icon(node)
   end
 
   for i, item in ipairs(ExtIcons.match_tail) do
-    if ((item.rtype == nil or item.rtype == node.rtype) and (item.type == nil or item.type == node.type) and item.tail == node.cache.tail) then
+    if ((item.rtype == nil or item.rtype == node.rtype) and (item.type == nil or item.type == node.type) and item.tail == node.tail) then
       return item.icon
     end
   end

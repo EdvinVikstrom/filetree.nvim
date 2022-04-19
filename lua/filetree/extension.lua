@@ -1,13 +1,14 @@
 local Extension = {}
 
--- return: Extension
+---@returns Extension metatable
 function Extension:inherit()
   local self = setmetatable({}, { __index = Extension })
   return self
 end
 
--- params: {name: String, conf: Table}
--- return: Extension
+---@param name  name of the extension
+---@param conf  table with options {option = value, ...}. |filetree-config|
+---@returns Extension metatable
 function Extension:new(name, conf)
   local self = setmetatable({}, { __index = Extension })
   self.name = name
@@ -27,6 +28,7 @@ end
 function Extension:setup_keymaps()
 end
 
+---@param filetree  FileTree metatable
 function Extension:init(filetree)
 end
 

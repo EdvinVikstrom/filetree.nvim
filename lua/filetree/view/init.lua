@@ -1,7 +1,7 @@
 local View = {}
 
--- params: {conf: Table}
--- return: View
+---@param conf  table with options {option = value, ...}. |filetree-config|
+---@returns View metatable
 function View:new(conf)
   local self = setmetatable({}, { __index = View })
   self.config = (conf or {})
@@ -37,13 +37,13 @@ end
 
 function View:setup_buffer()
   self.buf = vim.fn.bufadd("")
-  self.bufnr = vim.fn.bufnr(self.buf)
+  self.buf = vim.api.nvim_create_buf(false, false)
 
   vim.api.nvim_buf_set_option(self.buf, "buftype", "nofile")
   vim.api.nvim_buf_set_option(self.buf, "modifiable", false)
 end
 
-function View:setup_window()
+function View:open_window()
   vim.api.nvim_command("vsplit")
   self.win = vim.api.nvim_get_current_win()
 
@@ -56,13 +56,24 @@ function View:setup_window()
   vim.api.nvim_win_set_option(self.win, "relativenumber", false)
   vim.api.nvim_win_set_width(self.win, self.config.width)
   vim.api.nvim_win_set_buf(self.win, self.buf)
+
+  self:refresh()
+end
+
+function View:close_window()
+  if (self.win ~= nil) then
+    vim.api.nvim_win_close(self.win, false)
+    self.win = nil
+  end
+end
+
+function View:refresh()
+  self.width = vim.api.nvim_win_get_width(self.win)
+  self:full_redraw()
 end
 
 function View:full_redraw()
-  self:begin_render()
-  for i, node in ipairs(self.tree.children) do
-    self:render_node(node)
-  end
+  self:render_tree(self.tree)
   self:redraw()
 end
 
@@ -73,32 +84,33 @@ function View:redraw()
   self:draw_tree(self.tree)
   self:draw_lines()
 
-  for i, node in ipairs(self.nodes) do
-    self:highlight_node(node)
+  for i, nview in ipairs(self.nodes) do
+    self:highlight_node(nview)
   end
 end
 
+---@private
 function View:draw_lines()
   vim.api.nvim_buf_set_option(self.buf, "modifiable", true)
-  vim.api.nvim_buf_set_lines(self.bufnr, 0, -1, false, self.lines)
+  vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, self.lines)
   vim.api.nvim_buf_set_option(self.buf, "modifiable", false)
 end
 
--- params: {node: NodeView}
-function View:highlight_node(node)
-  for i, hl in ipairs(node.hl) do
-    vim.api.nvim_buf_add_highlight(self.buf, hl.namespace, hl.group, node.lnum, hl.first, hl.last)
+---@private
+function View:highlight_node(nview)
+  for i, hl in ipairs(nview.hl) do
+    vim.api.nvim_buf_add_highlight(self.buf, hl.namespace, hl.group, nview.lnum, hl.first, hl.last)
   end
 end
 
--- params: {tree: Tree}
+---@private
 function View:draw_tree(tree)
   for i, node in ipairs(tree.children) do
     self:draw_node(node)
   end
 end
 
--- params: {node: Node}
+---@private
 function View:draw_node(node)
   if (node:is_hidden() and not(self.config.show_hidden)) then
     return
@@ -115,23 +127,24 @@ function View:draw_node(node)
   end
 end
 
-function View:begin_render()
-  self.width = vim.api.nvim_win_get_width(self.win)
+---@param tree  Tree metatable
+function View:render_tree(tree)
+  for i, child in ipairs(tree.children) do
+    self:render_node(child)
+  end
 end
 
--- params: {node: NodeView}
+---@param node  Node metatable
 function View:render_node(node)
   node.view:clear()
   self.config.render_callback(self, node.view)
 
   if (node.expanded) then
-    for i, child in ipairs(node.children) do
-      self:render_node(child)
-    end
+    self:render_tree(node)
   end
 end
 
--- params: {nview: NodeView}
+---@param nview  NodeView metatable
 function View:render_callback(nview)
   nview:render(self.config)
   local width = self.width - self.config.line_width
@@ -141,7 +154,7 @@ function View:render_callback(nview)
 
   -- highlight
   local len = nview.node.depth + #nview:get_text()
-  if (nview.node.rtype == "dir") then
+  if (nview.node.rtype == "directory") then
     nview:add_highlight(self.config.hl.namespace, self.config.hl.directory, 0, len)
   else
     nview:add_highlight(self.config.hl.namespace, self.config.hl.file, 0, len)
@@ -152,7 +165,7 @@ function View:render_callback(nview)
   end
 end
 
--- return Node
+---@returns Node metatable
 function View:get_selected()
   if (#self.nodes == 0) then
     return nil
@@ -162,24 +175,24 @@ function View:get_selected()
   return self.nodes[index].node
 end
 
--- params {node: Node}
+---@param node  Node metatable
 function View:set_selected(node)
   vim.fn.cursor(node.view.index + self.config.cursor_offset, 0)
 end
 
--- return array{Node ...}
+---@returns table with nodes
 function View:get_marked()
   return self.marked_nodes
 end
 
--- params {node: Node}
+---@param node  Node metatable
 function View:add_marked(node)
   node.marked = true
   self:render_node(node)
   table.insert(self.marked_nodes, node)
 end
 
--- params {node: Node}
+---@param node  Node metatable
 function View:remove_marked(node)
   node.marked = false
   self:render_node(node)
@@ -210,9 +223,14 @@ end
 
 -- ### Getters and setters ### ---
 
--- params: {tree: Tree}
+---@param tree  Tree metatable
 function View:set_tree(tree)
   self.tree = tree
+end
+
+---@returns true if window is open
+function View:is_active()
+  return self.win ~= nil
 end
 
 return View

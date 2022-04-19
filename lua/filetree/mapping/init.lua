@@ -2,8 +2,9 @@ local Mapping = {}
 
 local Help = require("filetree.help")
 
--- params: {filetree: FileTree, conf: Table}
--- return: Mapping
+---@param filetree  FileTree metatable
+---@param conf  table with options {option = value, ...}. |filetree-config|
+---@returns Mapping metatable
 function Mapping:new(filetree, conf)
   local self = setmetatable({}, { __index = Mapping })
   self.filetree = filetree
@@ -15,6 +16,7 @@ function Mapping:setup_config()
   local conf = self.config
   if (conf.wrap_cursor == nil) then conf.wrap_cursor = false end
   if (conf.close_children == nil) then conf.close_children = true end
+  conf.keymaps = (conf.keymaps or Mapping.default_keymaps)
 end
 
 function Mapping:setup_mappings()
@@ -23,24 +25,9 @@ function Mapping:setup_mappings()
     { event = "WinScrolled", pattern = "*", callback = function() self:autocmd_win_scrolled() end },
     { event = "User", pattern = "dir_changed", callback = function() self:autocmd_user_dir_changed() end }
   }
-  self.keymaps = {
-    { lhs = "j", rhs = function() self:keymap_move_down() end },
-    { lhs = "k", rhs = function() self:keymap_move_up() end },
-    { lhs = "l", rhs = function() self:keymap_open() end },
-    { lhs = "h", rhs = function() self:keymap_close() end },
-    { lhs = "<Enter>", rhs = function() self:keymap_load() end },
-    { lhs = "w", rhs = function() self:keymap_mark(false) end },
-    { lhs = "W", rhs = function() self:keymap_mark(true) end },
-    { lhs = "N", rhs = function() self:keymap_make_file() end },
-    { lhs = "K", rhs = function() self:keymap_make_directory() end },
-    { lhs = "r", rhs = function() self:keymap_rename() end },
-    { lhs = "m", rhs = function() self:keymap_move() end },
-    { lhs = "x", rhs = function() self:keymap_remove(false) end },
-    { lhs = "X", rhs = function() self:keymap_remove(true) end },
-    { lhs = ".", rhs = function() self:keymap_toggle_hidden() end },
-    { lhs = ",", rhs = function() self:keymap_reload() end },
-    { lhs = "<Esc>", rhs = function() self:keymap_clear() end }
-  }
+
+  vim.cmd("command FTreeOpen lua _G.filetree.view:open_window()")
+  vim.cmd("command FTreeClose lua _G.filetree.view:close_window()")
 end
 
 function Mapping:setup_autocmds()
@@ -57,8 +44,8 @@ function Mapping:setup_autocmds()
 end
 
 function Mapping:setup_keymaps()
-  for i, map in ipairs(self.keymaps) do
-    vim.keymap.set('n', map.lhs, map.rhs, {buffer = self.filetree.view.buf, silent = true})
+  for key, map in pairs(self.config.keymaps) do
+    vim.keymap.set('n', key, function() map(self) end, {buffer = self.filetree.view.buf, silent = true})
   end
 end
 
@@ -76,7 +63,6 @@ end
 -- ### Autocmd callback ### --
 
 function Mapping:autocmd_vim_enter()
-  self.filetree:load_tree()
 end
 
 function Mapping:autocmd_win_scrolled()
@@ -90,7 +76,42 @@ end
 
 -- ### Keymap callback ### --
 
-function Mapping:keymap_move_down()
+function Mapping:cursor_down() return function(self) self:keymap_cursor_down() end end
+function Mapping:cursor_up() return function(self) self:keymap_cursor_up() end end
+function Mapping:open() return function(self) self:keymap_open() end end
+function Mapping:close() return function(self) self:keymap_close() end end
+function Mapping:enter() return function(self) self:keymap_enter() end end
+function Mapping:mark(reverse) return function(self) self:keymap_mark(reverse) end end
+function Mapping:make_file() return function(self) self:keymap_make_file() end end
+function Mapping:make_directory() return function(self) self:keymap_make_directory() end end
+function Mapping:rename() return function(self) self:keymap_rename() end end
+function Mapping:copy() return function(self) self:keymap_copy() end end
+function Mapping:move() return function(self) self:keymap_move() end end
+function Mapping:remove() return function(self) self:keymap_remove() end end
+function Mapping:toggle_hidden() return function(self) self:keymap_toggle_hidden() end end
+function Mapping:redraw() return function(self) self:keymap_redraw() end end
+function Mapping:clear() return function(self) self:keymap_clear() end end
+
+Mapping.default_keymaps = {
+  ["j"] = Mapping:cursor_down(),
+  ["k"] = Mapping:cursor_up(),
+  ["l"] = Mapping:open(),
+  ["h"] = Mapping:close(),
+  ["<Enter>"] = Mapping:enter(),
+  ["w"] = Mapping:mark(false),
+  ["W"] = Mapping:mark(true),
+  ["N"] = Mapping:make_file(),
+  ["K"] = Mapping:make_directory(),
+  ["r"] = Mapping:rename(),
+  ["c"] = Mapping:copy(),
+  ["m"] = Mapping:move(),
+  ["x"] = Mapping:remove(),
+  ["."] = Mapping:toggle_hidden(),
+  [","] = Mapping:redraw(),
+  ["<Esc>"] = Mapping:clear()
+}
+
+function Mapping:keymap_cursor_down()
   local line = vim.fn.line(".")
   if (line == vim.api.nvim_buf_line_count(self.filetree.view.buf)) then
     if (self.config.wrap_cursor) then
@@ -101,7 +122,7 @@ function Mapping:keymap_move_down()
   end
 end
 
-function Mapping:keymap_move_up()
+function Mapping:keymap_cursor_up()
   local line = vim.fn.line(".")
   if (line == 1) then
     if (self.config.wrap_cursor) then
@@ -114,7 +135,7 @@ end
 
 function Mapping:keymap_open()
   local selected = self.filetree.view:get_selected()
-  if (selected.rtype == "dir") then
+  if (selected.rtype == "directory") then
     if (selected.expanded) then
       selected:close()
       self.filetree.view:render_node(selected)
@@ -123,7 +144,7 @@ function Mapping:keymap_open()
       selected:expand()
       self.filetree.view:render_node(selected)
       self.filetree.view:redraw()
-      self:keymap_move_down()
+      self:keymap_cursor_down()
     end
   else
     selected:open()
@@ -132,7 +153,7 @@ end
 
 function Mapping:keymap_close()
   local selected = self.filetree.view:get_selected()
-  if (selected.rtype == "dir" and selected.expanded) then
+  if (selected.rtype == "directory" and selected.expanded) then
     selected:close(self.config.close_children)
     self.filetree.view:render_node(selected)
   else
@@ -142,6 +163,7 @@ function Mapping:keymap_close()
       if (not(self.filetree.tree.path == parent_path)) then
 	self.filetree:set_directory(parent_path)
 	self.filetree:load_tree()
+	self.filetree.view:render_tree(self.filetree.tree)
       end
     else
       selected.parent:close(self.config.close_children)
@@ -152,9 +174,9 @@ function Mapping:keymap_close()
   self.filetree.view:redraw()
 end
 
-function Mapping:keymap_load()
+function Mapping:keymap_enter()
   local selected = self.filetree.view:get_selected()
-  if (selected.rtype == "dir") then
+  if (selected.rtype == "directory") then
     self.filetree:set_directory(selected.path)
     self.filetree:load_tree()
   else
@@ -163,7 +185,7 @@ function Mapping:keymap_load()
   self.filetree.view:redraw()
 end
 
--- params: {reverse: Boolean}
+---@param reverse  move cursor up instead of down if true
 function Mapping:keymap_mark(reverse)
   local selected = self.filetree.view:get_selected()
 
@@ -175,9 +197,9 @@ function Mapping:keymap_mark(reverse)
 
   self.filetree.view:redraw()
   if (reverse) then
-    self:keymap_move_up()
+    self:keymap_cursor_up()
   else
-    self:keymap_move_down()
+    self:keymap_cursor_down()
   end
 end
 
@@ -191,12 +213,13 @@ function Mapping:keymap_make_file()
     local path = dir_node.path.."/"..vim.trim(name)
     vim.fn.writefile({}, path, "b")
     if (vim.fn.filereadable(path)) then
-      dir_node:add_file(path)
+      local created = dir_node:add_file(path)
+      self.filetree.view:render_node(created)
       dir_node:sort()
+      self.filetree.view:redraw()
+      vim.fn.cursor(created.view.index, 0)
     end
   end)
-
-  self.filetree.view:redraw()
 end
 
 function Mapping:keymap_make_directory()
@@ -209,12 +232,13 @@ function Mapping:keymap_make_directory()
     local path = dir_node.path.."/"..vim.trim(name)
     vim.fn.mkdir(path)
     if (vim.fn.isdirectory(path)) then
-      dir_node:add_file(path)
+      local created = dir_node:add_file(path)
+      self.filetree.view:render_node(created)
       dir_node:sort()
+      self.filetree.view:redraw()
+      vim.fn.cursor(created.view.index, 0)
     end
   end)
-
-  self.filetree.view:redraw()
 end
 
 function Mapping:keymap_rename()
@@ -244,10 +268,44 @@ function Mapping:keymap_rename()
   vim.fn.rename(selected.path, new_path)
   if (Help:file_exists(new_path)) then
     selected:delete()
-    dir_node:add_file(new_path)
+    local created = dir_node:add_file(new_path)
+    self.filetree.view:render_node(created)
     dir_node:sort()
+    self.filetree.view:redraw()
+    vim.fn.cursor(created.view.index, 0)
   end
 
+  self.filetree.view:redraw()
+end
+
+function Mapping:keymap_copy()
+  local selected = self.filetree.view:get_selected()
+  local dir_node = get_node_tree(selected)
+  local to_copy = self.filetree.view:get_marked()
+
+  if (#to_copy == 0) then
+    print("No files selected")
+    return
+  end
+
+  for i, node in ipairs(to_copy) do
+    local new_path = Help:make_path(dir_node.path, node.name)
+    local continue = true
+    if (Help:file_exists(new_path)) then
+      continue = Help:get_user_yesno("A file with name '"..node.name.."' already exists. Overwrite file?", false)
+    end
+
+    if (continue) then
+      Help:copy_file(node.path, new_path)
+      if (Help:file_exists(new_path)) then
+	local created = dir_node:add_file(new_path)
+	self.filetree.view:render_node(created)
+	dir_node:sort()
+      end
+    end
+  end
+
+  self.filetree.view:clear_marked()
   self.filetree.view:redraw()
 end
 
@@ -272,7 +330,8 @@ function Mapping:keymap_move()
       vim.fn.rename(node.path, new_path)
       if (Help:file_exists(new_path)) then
 	node:delete(node)
-	dir_node:add_file(new_path)
+	local created = dir_node:add_file(new_path)
+	self.filetree.view:render_node(created)
 	dir_node:sort()
       end
     end
@@ -322,7 +381,7 @@ function Mapping:keymap_toggle_hidden()
   self.filetree.view:redraw()
 end
 
-function Mapping:keymap_reload()
+function Mapping:keymap_redraw()
   self.filetree.view:full_redraw()
 end
 
@@ -334,8 +393,6 @@ end
 
 -- ### Helper functions ### --
 
--- params: {node: Node}
--- return: Node
 function get_node_tree(node)
   if (node == nil) then
     return self.filetree.tree
@@ -351,11 +408,13 @@ function get_node_tree(node)
   end
 end
 
--- params: {names: Table{String ...}, fn: Function}
 function for_each_name(names, fn)
   local name_list = vim.split(names, ",")
   for i, name in ipairs(name_list) do
-    fn(name)
+    name = vim.trim(name)
+    if (name ~= "") then
+      fn(name)
+    end
   end
 end
 
