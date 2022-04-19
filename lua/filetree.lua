@@ -2,7 +2,7 @@ local FileTree = {}
 
 local View = require("filetree.view")
 local Mapping = require("filetree.mapping")
-local NodeView = require("filetree.view.node")
+local NodeView = require("filetree.node_view")
 local Tree = require("filetree.tree")
 local Help = require("filetree.help")
 
