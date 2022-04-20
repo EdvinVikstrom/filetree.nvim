@@ -57,7 +57,7 @@ function View:open_window()
   vim.api.nvim_win_set_width(self.win, self.config.width)
   vim.api.nvim_win_set_buf(self.win, self.buf)
 
-  self:refresh()
+  self:full_redraw()
 end
 
 function View:close_window()
@@ -69,10 +69,10 @@ end
 
 function View:refresh()
   self.width = vim.api.nvim_win_get_width(self.win)
-  self:full_redraw()
 end
 
 function View:full_redraw()
+  self:refresh()
   self:render_tree(self.tree)
   self:redraw()
 end
@@ -180,6 +180,21 @@ function View:set_selected(node)
   vim.fn.cursor(node.view.index + self.config.cursor_offset, 0)
 end
 
+---@returns cursor position relative to nodes
+function View:get_cursor()
+  return vim.fn.line(".") - self.config.cursor_offset
+end
+
+---@param line  line number
+function View:set_cursor(line)
+  vim.fn.cursor(line + self.config.cursor_offset, 0)
+end
+
+---returns number of nodes in buffer
+function View:get_node_count()
+  return #self.nodes
+end
+
 ---@returns table with nodes
 function View:get_marked()
   return self.marked_nodes
@@ -231,6 +246,18 @@ end
 ---@returns true if window is open
 function View:is_active()
   return self.win ~= nil
+end
+
+---@returns true if window width changed
+function View:should_redraw()
+  if (self.win == nil) then
+    return false
+  end
+
+  if (self.width ~= vim.api.nvim_win_get_width(self.win)) then
+    return true
+  end
+  return false
 end
 
 return View

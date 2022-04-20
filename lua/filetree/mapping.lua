@@ -22,6 +22,8 @@ end
 function Mapping:setup_mappings()
   self.autocmds = {
     { event = "VimEnter", pattern = "*", callback = function() self:autocmd_vim_enter() end },
+    { event = "VimLeave", pattern = "*", callback = function() self:autocmd_vim_leave() end },
+    { event = "VimResized", pattern = "*", callback = function() self:autocmd_vim_resized() end },
     { event = "WinScrolled", pattern = "*", callback = function() self:autocmd_win_scrolled() end },
     { event = "User", pattern = "dir_changed", callback = function() self:autocmd_user_dir_changed() end }
   }
@@ -49,28 +51,27 @@ function Mapping:setup_keymaps()
   end
 end
 
-function Mapping:setup_watcher()
-  -- TODO
-end
-
-function Mapping:full_redraw()
-  self.filetree.view:begin_render()
-  self.filetree:render_tree()
-  self.filetree.view:redraw()
-end
-
 
 -- ### Autocmd callback ### --
 
 function Mapping:autocmd_vim_enter()
 end
 
-function Mapping:autocmd_win_scrolled()
+function Mapping:autocmd_vim_leave()
+  self.filetree:destroy()
+end
+
+function Mapping:autocmd_vim_resized()
   self.filetree.view:full_redraw()
 end
 
+function Mapping:autocmd_win_scrolled()
+  if (self.filetree.view:should_redraw()) then
+    self.filetree.view:full_redraw()
+  end
+end
+
 function Mapping:autocmd_user_dir_changed()
-  self:setup_watcher()
 end
 
 
@@ -112,29 +113,37 @@ Mapping.default_keymaps = {
 }
 
 function Mapping:keymap_cursor_down()
-  local line = vim.fn.line(".")
-  if (line == vim.api.nvim_buf_line_count(self.filetree.view.buf)) then
+  local cursor = self.filetree.view:get_cursor()
+  local count = self.filetree.view:get_node_count()
+
+  if (cursor == count) then
     if (self.config.wrap_cursor) then
-      vim.fn.cursor(1, 0)
+      self.filetree.view:set_cursor(1)
     end
   else
-    vim.fn.cursor(line + 1, 0)
+    self.filetree.view:set_cursor(cursor + 1)
   end
 end
 
 function Mapping:keymap_cursor_up()
-  local line = vim.fn.line(".")
-  if (line == 1) then
+  local cursor = self.filetree.view:get_cursor()
+  local count = self.filetree.view:get_node_count()
+
+  if (cursor == 1) then
     if (self.config.wrap_cursor) then
-      vim.fn.cursor(vim.api.nvim_buf_line_count(self.filetree.view.buf), 0)
+      self.filetree.view:set_cursor(count)
     end
   else
-    vim.fn.cursor(line - 1, 0)
+    self.filetree.view:set_cursor(cursor - 1)
   end
 end
 
 function Mapping:keymap_open()
   local selected = self.filetree.view:get_selected()
+  if (selected == nil) then
+    return
+  end
+
   if (selected.rtype == "directory") then
     if (selected.expanded) then
       selected:close()
@@ -153,7 +162,12 @@ end
 
 function Mapping:keymap_close()
   local selected = self.filetree.view:get_selected()
-  if (selected.rtype == "directory" and selected.expanded) then
+  if (selected == nil) then
+    if (self.filetree:set_parent_as_root()) then
+      self.filetree.view:render_tree(self.filetree.tree)
+      self.filetree.view:set_cursor(1)
+    end
+  elseif (selected.rtype == "directory" and selected.expanded) then
     selected:close(self.config.close_children)
     self.filetree.view:render_node(selected)
   else
@@ -161,9 +175,10 @@ function Mapping:keymap_close()
     if (selected.parent.parent == nil) then
       local parent_path = Help:get_file_parent(self.filetree.tree.path)
       if (not(self.filetree.tree.path == parent_path)) then
-	self.filetree:set_directory(parent_path)
-	self.filetree:load_tree()
-	self.filetree.view:render_tree(self.filetree.tree)
+	if (self.filetree:set_parent_as_root()) then
+	  self.filetree.view:render_tree(self.filetree.tree)
+	  self.filetree.view:set_cursor(1)
+	end
       end
     else
       selected.parent:close(self.config.close_children)
@@ -176,9 +191,16 @@ end
 
 function Mapping:keymap_enter()
   local selected = self.filetree.view:get_selected()
+  if (selected == nil) then
+    return
+  end
+
   if (selected.rtype == "directory") then
     self.filetree:set_directory(selected.path)
-    self.filetree:load_tree()
+    if (self.filetree:load_tree()) then
+      self.filetree.view:render_tree(self.filetree.tree)
+      self.filetree.view:set_cursor(1)
+    end
   else
     selected:open()
   end
@@ -188,6 +210,9 @@ end
 ---@param reverse  move cursor up instead of down if true
 function Mapping:keymap_mark(reverse)
   local selected = self.filetree.view:get_selected()
+  if (selected == nil) then
+    return
+  end
 
   if (selected.marked) then
     self.filetree.view:remove_marked(selected)
@@ -205,13 +230,13 @@ end
 
 function Mapping:keymap_make_file()
   local selected = self.filetree.view:get_selected()
-  local dir_node = get_node_tree(selected)
+  local dir_node = self:get_node_tree(selected)
 
   local input_names = Help:get_user_input("New file names (comma seperated)")
 
   for_each_name(input_names, function(name)
-    local path = dir_node.path.."/"..vim.trim(name)
-    vim.fn.writefile({}, path, "b")
+    local path = dir_node.path.."/"..name
+    self.filetree:make_file(path)
     if (vim.fn.filereadable(path)) then
       local created = dir_node:add_file(path)
       self.filetree.view:render_node(created)
@@ -224,13 +249,13 @@ end
 
 function Mapping:keymap_make_directory()
   local selected = self.filetree.view:get_selected()
-  local dir_node = get_node_tree(selected)
+  local dir_node = self:get_node_tree(selected)
 
   local input_names = Help:get_user_input("New directory names (comma seperated)")
 
   for_each_name(input_names, function(name)
-    local path = dir_node.path.."/"..vim.trim(name)
-    vim.fn.mkdir(path)
+    local path = dir_node.path.."/"..name
+    self.filetree:make_directory(path)
     if (vim.fn.isdirectory(path)) then
       local created = dir_node:add_file(path)
       self.filetree.view:render_node(created)
@@ -249,7 +274,7 @@ function Mapping:keymap_rename()
     return
   end
 
-  local dir_node = get_node_tree(selected)
+  local dir_node = self:get_node_tree(selected)
 
   local new_name = Help:get_user_input("New file name", selected.name)
   new_name = vim.trim(new_name)
@@ -265,7 +290,7 @@ function Mapping:keymap_rename()
     end
   end
 
-  vim.fn.rename(selected.path, new_path)
+  self.filetree:move_file(selected.path, new_path)
   if (Help:file_exists(new_path)) then
     selected:delete()
     local created = dir_node:add_file(new_path)
@@ -280,7 +305,7 @@ end
 
 function Mapping:keymap_copy()
   local selected = self.filetree.view:get_selected()
-  local dir_node = get_node_tree(selected)
+  local dir_node = self:get_node_tree(selected)
   local to_copy = self.filetree.view:get_marked()
 
   if (#to_copy == 0) then
@@ -296,7 +321,7 @@ function Mapping:keymap_copy()
     end
 
     if (continue) then
-      Help:copy_file(node.path, new_path)
+      self.filetree:copy_file(node.path, new_path)
       if (Help:file_exists(new_path)) then
 	local created = dir_node:add_file(new_path)
 	self.filetree.view:render_node(created)
@@ -311,7 +336,7 @@ end
 
 function Mapping:keymap_move()
   local selected = self.filetree.view:get_selected()
-  local dir_node = get_node_tree(selected)
+  local dir_node = self:get_node_tree(selected)
   local to_move = self.filetree.view:get_marked()
 
   if (#to_move == 0) then
@@ -327,7 +352,7 @@ function Mapping:keymap_move()
     end
 
     if (continue) then
-      vim.fn.rename(node.path, new_path)
+      self.filetree:move_file(node.path, new_path)
       if (Help:file_exists(new_path)) then
 	node:delete(node)
 	local created = dir_node:add_file(new_path)
@@ -366,7 +391,7 @@ function Mapping:keymap_remove()
 	path = node.rpath
       end
     end
-    vim.fn.delete(path, "rf")
+    self.filetree:remove_file(path)
     if (not Help:file_exists(path)) then
       node:delete()
     end
@@ -393,7 +418,7 @@ end
 
 -- ### Helper functions ### --
 
-function get_node_tree(node)
+function Mapping:get_node_tree(node)
   if (node == nil) then
     return self.filetree.tree
   end

@@ -13,6 +13,18 @@ function Tree:new(conf, name, path, parent, depth, type)
   return self
 end
 
+function Tree:destroy()
+  if (self.fs_event) then
+    self:destroy_file_event()
+  end
+
+  for i, node in ipairs(self.children) do
+    if (node.destroy) then
+      node:destroy()
+    end
+  end
+end
+
 function Tree:expand()
   if (self.loaded) then
     --local new_time = vim.fn.getftime(self.path)
@@ -49,13 +61,13 @@ function Tree:reload()
   local dir, err, err_name = vim.loop.fs_opendir(self.path, nil, 4000)
   if (err ~= nil) then
     print("failed to open directory:", err)
-    return err_name
+    return false
   end
 
   local files, err, err_name = vim.loop.fs_readdir(dir)
   if (err ~= nil) then
     print("failed to read directory:", err)
-    return err_name
+    return false
   end
 
   vim.loop.fs_closedir(dir)
@@ -71,6 +83,30 @@ function Tree:reload()
 
   self:sort()
   self.loaded = true
+
+  if (self.config.event_callback ~= nil) then
+    self:setup_file_event()
+  end
+  return true
+end
+
+function Tree:setup_file_event()
+  local event_conf = {
+    watch_entry = true,
+    stat = true,
+    recursive = false
+  }
+
+  self.fs_event = vim.loop.new_fs_event()
+  self.fs_event:start(self.path, event_conf, vim.schedule_wrap(function(err, filename, events)
+    if (not err) then
+      self.config.event_callback(self, filename, events)
+    end
+  end))
+end
+
+function Tree:destroy_file_event()
+  self.fs_event:stop()
 end
 
 function Tree:sort()
@@ -109,6 +145,16 @@ function Tree:remove_node(node)
 
   if (not(index == 0)) then
     table.remove(self.children, index)
+  end
+end
+
+---@param path  file path
+---@returns Node metatable
+function Tree:find_node(path)
+  for i, child in ipairs(self.children) do
+    if (child.path == path) then
+      return child
+    end
   end
 end
 

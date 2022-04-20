@@ -73,12 +73,6 @@ function Help:get_file_type(path)
   return type
 end
 
-function Help:copy_file(src, dst)
-  -- TODO: better copy
-  local content = vim.fn.readfile(src, "b")
-  vim.fn.writefile(content, dst, "b")
-end
-
 -- NOTE: if def is true then default is 'yes', otherwise 'no'
 function Help:get_user_yesno(msg, def)
   if (def) then
