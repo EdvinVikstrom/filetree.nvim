@@ -15,7 +15,7 @@ end
 ---@param depth  directory level
 ---@param type  file type
 ---@returns Node metatable
-function Node:new(conf, name, path, parent, depth, type)
+function Node:new(name, path, parent, depth, type)
   local self = setmetatable({}, { __index = Node })
   self.config = conf
   self.name = name
@@ -37,9 +37,11 @@ function Node:new(conf, name, path, parent, depth, type)
   self.tail = Help:get_file_extension(self.name)
 
   self.marked = false
-
-  self.config.init_callback(self)
   return self
+end
+
+function Node:delete()
+  self.parent:remove_node(self)
 end
 
 ---@returns true if name starts with '.'

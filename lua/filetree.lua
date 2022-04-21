@@ -2,7 +2,6 @@ local FileTree = {}
 
 local View = require("filetree.view")
 local Mapping = require("filetree.mapping")
-local NodeView = require("filetree.node_view")
 local Tree = require("filetree.tree")
 local Help = require("filetree.help")
 
@@ -44,25 +43,17 @@ function FileTree:new(conf)
   return self
 end
 
-function FileTree:destroy()
-  if (self.tree ~= nil) then
-    self.tree:destroy()
-  end
-end
-
 function FileTree:setup_config()
   local conf = self.config
   conf.directory = (conf.directory or vim.fn.getcwd())
   conf.node = (conf.node or {})
-  conf.node.init_callback = (conf.node.init_callback or function(node) self:node_init_callback(node) end)
-  conf.node.event_callback = (conf.node.event_callback or function(node, file, events) self:node_event_callback(node, file, events) end)
 end
 
 function FileTree:load_tree()
   local file_name = Help:get_file_name(self.config.directory)
   local file_type = Help:get_file_type(self.config.directory)
 
-  local tree = Tree:new(self.config.node, file_name, self.config.directory, nil, 0, file_type)
+  local tree = Tree:new(file_name, self.config.directory, nil, 0, file_type)
   return self:set_root(tree)
 end
 
@@ -72,10 +63,6 @@ end
 function FileTree:set_root(tree)
   if (not tree:reload()) then
     return false
-  end
-
-  if (self.tree ~= nil) then
-    self.tree:destroy()
   end
 
   self.tree = tree
@@ -91,20 +78,6 @@ function FileTree:set_parent_as_root()
 
   self:set_directory(parent)
   return self:load_tree()
-end
-
----@param node  Node metatable
-function FileTree:node_init_callback(node)
-  node.open = function(node)
-    self:open_file(node.path)
-  end
-
-  node.delete = function(node)
-    node.parent:remove_node(node)
-    node.valid = false
-  end
-
-  node.view = NodeView:new(node)
 end
 
 ---@param tree  Tree metatable

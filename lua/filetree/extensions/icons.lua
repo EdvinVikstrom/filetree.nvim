@@ -30,17 +30,17 @@ end
 
 ---@param filetree  FileTree metatable
 function ExtIcons:setup_render_callback(filetree)
-  return function(view, nview)
-    view:render_callback(nview)
+  return function(view, node)
+    view:render_callback(node)
 
-    local len = vim.fn.strchars(nview.line)
+    local len = vim.fn.strchars(node.text)
     local off = view.width - len - 2
 
-    local icon = ExtIcons:get_icon(nview.node)
-    local icon_off = #nview.line + off
+    local icon = ExtIcons:get_icon(node)
+    local icon_off = #node.text + off
     local icon_end = icon_off + #icon.symbol
-    nview:add_highlight(self.hlns, icon.hl.name, icon_off, icon_end)
-    nview.line = nview.line..string.rep(" ", off)..icon.symbol
+    view:add_highlight(node, self.hlns, icon.hl.name, icon_off, icon_end)
+    node.text = node.text..string.rep(" ", off)..icon.symbol
   end
 end
 

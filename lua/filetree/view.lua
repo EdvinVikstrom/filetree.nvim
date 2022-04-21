@@ -32,7 +32,7 @@ function View:setup_config()
   conf.hl.namespace = (conf.hl.namespace or self.hlns)
   conf.hl.directory = (conf.hl.directory or "dir")
   conf.hl.file = (conf.hl.file or "file")
-  conf.render_callback = (conf.render_callback or function(view, nview) view:render_callback(nview) end)
+  conf.render_callback = (conf.render_callback or function(view, node) view:render_callback(node) end)
 end
 
 function View:setup_buffer()
@@ -84,8 +84,8 @@ function View:redraw()
   self:draw_tree(self.tree)
   self:draw_lines()
 
-  for i, nview in ipairs(self.nodes) do
-    self:highlight_node(nview)
+  for i, node in ipairs(self.nodes) do
+    self:highlight_node(node)
   end
 end
 
@@ -97,9 +97,9 @@ function View:draw_lines()
 end
 
 ---@private
-function View:highlight_node(nview)
-  for i, hl in ipairs(nview.hl) do
-    vim.api.nvim_buf_add_highlight(self.buf, hl.namespace, hl.group, nview.lnum, hl.first, hl.last)
+function View:highlight_node(node)
+  for i, hl in ipairs(node.hl) do
+    vim.api.nvim_buf_add_highlight(self.buf, hl.namespace, hl.group, node.lnum, hl.first, hl.last)
   end
 end
 
@@ -116,11 +116,11 @@ function View:draw_node(node)
     return
   end
 
-  table.insert(self.nodes, node.view)
-  node.view.index = #self.nodes
-  node.view.lnum = #self.lines
+  table.insert(self.nodes, node)
+  node.index = #self.nodes
+  node.lnum = #self.lines
 
-  table.insert(self.lines, node.view.line)
+  table.insert(self.lines, node.text)
 
   if (node.expanded) then
     self:draw_tree(node)
@@ -136,33 +136,68 @@ end
 
 ---@param node  Node metatable
 function View:render_node(node)
-  node.view:clear()
-  self.config.render_callback(self, node.view)
+  node.text = ""
+  node.hl = {}
+  self.config.render_callback(self, node)
 
   if (node.expanded) then
     self:render_tree(node)
   end
 end
 
----@param nview  NodeView metatable
-function View:render_callback(nview)
-  nview:render(self.config)
+---@param node  Node metatable
+function View:render_callback(node)
+  local head = "- "
+  if (node.rtype == "directory") then
+    if (node.expanded) then
+      head = self.config.symbols.tree_expanded.." "
+      node.text = head..node.name..'/'
+    else
+      head = self.config.symbols.tree_closed.." "
+      node.text = head..node.name..'/'
+    end
+  elseif (node.rtype == "link") then
+    node.text = head..node.name.."@"
+  elseif (node.rtype == "block") then
+    node.text = head..node.name.."#"
+  elseif (node.rtype == "char") then
+    node.text = head..node.name.."%"
+  elseif (node.rtype == "socket") then
+    node.text = head..node.name.."="
+  elseif (node.rtype == "fifo") then
+    node.text = head..node.name.."|"
+  else
+    node.text = head..node.name
+  end
+  if (node.marked) then
+    node.text = node.text.." *"
+  end
+  node.name_offset = #head
+
   local width = self.width - self.config.line_width
 
   -- offset text
-  nview.line = string.rep(" ", nview.node.depth)..nview:get_text()
+  node.text = string.rep(" ", node.depth)..node.text
 
   -- highlight
-  local len = nview.node.depth + #nview:get_text()
-  if (nview.node.rtype == "directory") then
-    nview:add_highlight(self.config.hl.namespace, self.config.hl.directory, 0, len)
+  local len = node.depth + #node.text
+  if (node.rtype == "directory") then
+    self:add_highlight(node, self.config.hl.namespace, self.config.hl.directory, 0, len)
   else
-    nview:add_highlight(self.config.hl.namespace, self.config.hl.file, 0, len)
+    self:add_highlight(node, self.config.hl.namespace, self.config.hl.file, 0, len)
   end
 
-  if (#nview.line > width) then
-    nview.line = string.sub(nview.line, 1, width).."…"
+  if (#node.text > width) then
+    node.text = string.sub(node.text, 1, width).."…"
   end
+end
+
+---@param namespace  highlight namespace
+---@param group  highlight group name
+---@param first  first column
+---@param last  last column
+function View:add_highlight(node, namespace, group, first, last)
+  table.insert(node.hl, {namespace = namespace, group = group, first = first, last = last})
 end
 
 ---@returns Node metatable
@@ -172,12 +207,12 @@ function View:get_selected()
   end
   local line = vim.fn.line(".")
   local index = line + self.config.cursor_offset
-  return self.nodes[index].node
+  return self.nodes[index]
 end
 
 ---@param node  Node metatable
 function View:set_selected(node)
-  vim.fn.cursor(node.view.index + self.config.cursor_offset, 0)
+  vim.fn.cursor(node.index + self.config.cursor_offset, 0)
 end
 
 ---@returns cursor position relative to nodes

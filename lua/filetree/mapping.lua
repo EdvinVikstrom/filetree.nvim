@@ -58,7 +58,6 @@ function Mapping:autocmd_vim_enter()
 end
 
 function Mapping:autocmd_vim_leave()
-  self.filetree:destroy()
 end
 
 function Mapping:autocmd_vim_resized()
@@ -156,7 +155,7 @@ function Mapping:keymap_open()
       self:keymap_cursor_down()
     end
   else
-    selected:open()
+    self.filetree:open_file(selected.path)
   end
 end
 
@@ -202,7 +201,7 @@ function Mapping:keymap_enter()
       self.filetree.view:set_cursor(1)
     end
   else
-    selected:open()
+    self.filetree:open_file(selected.path)
   end
   self.filetree.view:redraw()
 end
@@ -242,7 +241,7 @@ function Mapping:keymap_make_file()
       self.filetree.view:render_node(created)
       dir_node:sort()
       self.filetree.view:redraw()
-      vim.fn.cursor(created.view.index, 0)
+      self.filetree.view:set_selected(created)
     end
   end)
 end
@@ -261,7 +260,7 @@ function Mapping:keymap_make_directory()
       self.filetree.view:render_node(created)
       dir_node:sort()
       self.filetree.view:redraw()
-      vim.fn.cursor(created.view.index, 0)
+      self.filetree.view:set_selected(created)
     end
   end)
 end
@@ -297,7 +296,7 @@ function Mapping:keymap_rename()
     self.filetree.view:render_node(created)
     dir_node:sort()
     self.filetree.view:redraw()
-    vim.fn.cursor(created.view.index, 0)
+    self.filetree.view:set_selected(created)
   end
 
   self.filetree.view:redraw()
