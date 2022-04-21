@@ -6,6 +6,7 @@ function View:new(conf)
   local self = setmetatable({}, { __index = View })
   self.config = (conf or {})
 
+  self.nodes = {}
   self.marked_nodes = {}
   return self
 end
@@ -57,7 +58,7 @@ function View:open_window()
   vim.api.nvim_win_set_width(self.win, self.config.width)
   vim.api.nvim_win_set_buf(self.win, self.buf)
 
-  self:full_redraw()
+  self:force_redraw()
 end
 
 function View:close_window()
@@ -71,9 +72,11 @@ function View:refresh()
   self.width = vim.api.nvim_win_get_width(self.win)
 end
 
-function View:full_redraw()
+function View:force_redraw()
   self:refresh()
-  self:render_tree(self.tree)
+  for i, node in ipairs(self.nodes) do
+    node.changed = true
+  end
   self:redraw()
 end
 
@@ -116,6 +119,7 @@ function View:draw_node(node)
     return
   end
 
+  self:render_node(node)
   table.insert(self.nodes, node)
   node.index = #self.nodes
   node.lnum = #self.lines
@@ -127,21 +131,13 @@ function View:draw_node(node)
   end
 end
 
----@param tree  Tree metatable
-function View:render_tree(tree)
-  for i, child in ipairs(tree.children) do
-    self:render_node(child)
-  end
-end
-
 ---@param node  Node metatable
 function View:render_node(node)
-  node.text = ""
-  node.hl = {}
-  self.config.render_callback(self, node)
-
-  if (node.expanded) then
-    self:render_tree(node)
+  if (node.changed) then
+    node.text = ""
+    node.hl = {}
+    self.config.render_callback(self, node)
+    node.changed = false
   end
 end
 
@@ -237,14 +233,14 @@ end
 
 ---@param node  Node metatable
 function View:add_marked(node)
-  node.marked = true
+  node:mark()
   self:render_node(node)
   table.insert(self.marked_nodes, node)
 end
 
 ---@param node  Node metatable
 function View:remove_marked(node)
-  node.marked = false
+  node:unmark()
   self:render_node(node)
 
   local pos = 0
@@ -264,7 +260,7 @@ end
 
 function View:clear_marked()
   for i, node in ipairs(self.marked_nodes) do
-    node.marked = false
+    node:unmark()
     self:render_node(node)
   end
   self.marked_nodes = {}

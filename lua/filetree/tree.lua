@@ -3,7 +3,11 @@ local Tree = Node:inherit()
 
 local Help = require("filetree.help")
 
----@param conf  table with options {option = value, ...}. |filetree-config|
+---@param name  file name
+---@param path  file path
+---@param parent  Tree metatable with path of file parent
+---@param depth  directory level
+---@param type  file type
 ---@returns Tree metatable
 function Tree:new(name, path, parent, depth, type)
   local self = setmetatable(Node:new(name, path, parent, depth, type), { __index = Tree })
@@ -14,10 +18,9 @@ function Tree:new(name, path, parent, depth, type)
 end
 
 function Tree:expand()
-  if (not self.loaded) then
-    self:reload()
-  end
+  self:reload_recursive()
   self.expanded = true
+  self.changed = true
 end
 
 ---@param recursive  close children if true
@@ -27,6 +30,7 @@ function Tree:close(recursive)
   else
     self.expanded = false
   end
+  self.changed = true
 end
 
 function Tree:close_recursive()
@@ -64,11 +68,28 @@ function Tree:reload()
 	end
       end
     end
+
+    self:sort()
+  else
+    self.children = {}
   end
 
-  self:sort()
+  self.time = vim.fn.getftime(self.rpath)
   self.loaded = true
+  self.changed = true
   return true
+end
+
+function Tree:reload_recursive()
+  if (self:should_reload()) then
+    self:reload()
+  end
+
+  for i, node in ipairs(self.children) do
+    if (node.expanded) then
+      node:reload_recursive(changed)
+    end
+  end
 end
 
 function Tree:sort()
@@ -81,17 +102,20 @@ function Tree:sort()
     end
     return (string.upper(a.name) < string.upper(b.name))
   end)
+  self.changed = true
 end
 
 ---@param node  add Node metatable to children
 function Tree:add_node(node)
   table.insert(self.children, node)
+  self.changed = true
 end
 
 ---@param node  add Node metatable with path to children
 function Tree:add_file(path)
   local node = Node:new(Help:get_file_name(path), path, self, self.depth + 1, Help:get_file_type(path))
   table.insert(self.children, node)
+  self.changed = true
   return node
 end
 
@@ -108,6 +132,7 @@ function Tree:remove_node(node)
   if (not(index == 0)) then
     table.remove(self.children, index)
   end
+  self.changed = true
 end
 
 ---@param path  file path
@@ -118,6 +143,15 @@ function Tree:find_node(path)
       return child
     end
   end
+end
+
+---@returns true if changes where made in file system
+function Tree:should_reload()
+  if (self.loaded == false) then
+    return true
+  end
+
+  return vim.fn.getftime(self.rpath) > self.time
 end
 
 return Tree

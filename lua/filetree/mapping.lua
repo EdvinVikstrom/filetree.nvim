@@ -24,7 +24,8 @@ function Mapping:setup_mappings()
     { event = "VimEnter", pattern = "*", callback = function() self:autocmd_vim_enter() end },
     { event = "VimLeave", pattern = "*", callback = function() self:autocmd_vim_leave() end },
     { event = "VimResized", pattern = "*", callback = function() self:autocmd_vim_resized() end },
-    { event = "WinScrolled", pattern = "*", callback = function() self:autocmd_win_scrolled() end },
+    { event = "WinEnter", pattern = self.filetree.view.win, callback = function() self:autocmd_win_enter() end },
+    { event = "WinScrolled", pattern = self.filetree.view.win, callback = function() self:autocmd_win_scrolled() end },
     { event = "User", pattern = "dir_changed", callback = function() self:autocmd_user_dir_changed() end }
   }
 
@@ -61,12 +62,19 @@ function Mapping:autocmd_vim_leave()
 end
 
 function Mapping:autocmd_vim_resized()
-  self.filetree.view:full_redraw()
+  self.filetree.view:force_redraw()
+end
+
+function Mapping:autocmd_win_enter()
+  if (self.filetree.view:is_active()) then
+    self.filetree.tree:reload_recursive()
+    self.filetree.view:redraw()
+  end
 end
 
 function Mapping:autocmd_win_scrolled()
   if (self.filetree.view:should_redraw()) then
-    self.filetree.view:full_redraw()
+    self.filetree.view:force_redraw()
   end
 end
 
@@ -90,6 +98,7 @@ function Mapping:move() return function(self) self:keymap_move() end end
 function Mapping:remove() return function(self) self:keymap_remove() end end
 function Mapping:toggle_hidden() return function(self) self:keymap_toggle_hidden() end end
 function Mapping:redraw() return function(self) self:keymap_redraw() end end
+function Mapping:reload() return function(self) self:keymap_reload() end end
 function Mapping:clear() return function(self) self:keymap_clear() end end
 
 Mapping.default_keymaps = {
@@ -108,6 +117,7 @@ Mapping.default_keymaps = {
   ["x"] = Mapping:remove(),
   ["."] = Mapping:toggle_hidden(),
   [","] = Mapping:redraw(),
+  [";"] = Mapping:reload(),
   ["<Esc>"] = Mapping:clear()
 }
 
@@ -146,11 +156,9 @@ function Mapping:keymap_open()
   if (selected.rtype == "directory") then
     if (selected.expanded) then
       selected:close()
-      self.filetree.view:render_node(selected)
       self.filetree.view:redraw()
     else
       selected:expand()
-      self.filetree.view:render_node(selected)
       self.filetree.view:redraw()
       self:keymap_cursor_down()
     end
@@ -163,26 +171,22 @@ function Mapping:keymap_close()
   local selected = self.filetree.view:get_selected()
   if (selected == nil) then
     if (self.filetree:set_parent_as_root()) then
-      self.filetree.view:render_tree(self.filetree.tree)
       self.filetree.view:set_cursor(1)
     end
   elseif (selected.rtype == "directory" and selected.expanded) then
     selected:close(self.config.close_children)
-    self.filetree.view:render_node(selected)
   else
     -- check if parent is root
     if (selected.parent.parent == nil) then
       local parent_path = Help:get_file_parent(self.filetree.tree.path)
       if (not(self.filetree.tree.path == parent_path)) then
 	if (self.filetree:set_parent_as_root()) then
-	  self.filetree.view:render_tree(self.filetree.tree)
 	  self.filetree.view:set_cursor(1)
 	end
       end
     else
       selected.parent:close(self.config.close_children)
       self.filetree.view:set_selected(selected.parent)
-      self.filetree.view:render_node(selected.parent)
     end
   end
   self.filetree.view:redraw()
@@ -190,14 +194,11 @@ end
 
 function Mapping:keymap_enter()
   local selected = self.filetree.view:get_selected()
-  if (selected == nil) then
-    return
-  end
+  if (selected == nil) then return end
 
   if (selected.rtype == "directory") then
     self.filetree:set_directory(selected.path)
     if (self.filetree:load_tree()) then
-      self.filetree.view:render_tree(self.filetree.tree)
       self.filetree.view:set_cursor(1)
     end
   else
@@ -209,9 +210,7 @@ end
 ---@param reverse  move cursor up instead of down if true
 function Mapping:keymap_mark(reverse)
   local selected = self.filetree.view:get_selected()
-  if (selected == nil) then
-    return
-  end
+  if (selected == nil) then return end
 
   if (selected.marked) then
     self.filetree.view:remove_marked(selected)
@@ -230,6 +229,7 @@ end
 function Mapping:keymap_make_file()
   local selected = self.filetree.view:get_selected()
   local dir_node = self:get_node_tree(selected)
+  if (dir_node == nil) then return end
 
   local input_names = Help:get_user_input("New file names (comma seperated)")
 
@@ -238,7 +238,6 @@ function Mapping:keymap_make_file()
     self.filetree:make_file(path)
     if (vim.fn.filereadable(path)) then
       local created = dir_node:add_file(path)
-      self.filetree.view:render_node(created)
       dir_node:sort()
       self.filetree.view:redraw()
       self.filetree.view:set_selected(created)
@@ -249,6 +248,7 @@ end
 function Mapping:keymap_make_directory()
   local selected = self.filetree.view:get_selected()
   local dir_node = self:get_node_tree(selected)
+  if (dir_node == nil) then return end
 
   local input_names = Help:get_user_input("New directory names (comma seperated)")
 
@@ -257,7 +257,6 @@ function Mapping:keymap_make_directory()
     self.filetree:make_directory(path)
     if (vim.fn.isdirectory(path)) then
       local created = dir_node:add_file(path)
-      self.filetree.view:render_node(created)
       dir_node:sort()
       self.filetree.view:redraw()
       self.filetree.view:set_selected(created)
@@ -293,7 +292,6 @@ function Mapping:keymap_rename()
   if (Help:file_exists(new_path)) then
     selected:delete()
     local created = dir_node:add_file(new_path)
-    self.filetree.view:render_node(created)
     dir_node:sort()
     self.filetree.view:redraw()
     self.filetree.view:set_selected(created)
@@ -305,6 +303,7 @@ end
 function Mapping:keymap_copy()
   local selected = self.filetree.view:get_selected()
   local dir_node = self:get_node_tree(selected)
+  if (dir_node == nil) then return end
   local to_copy = self.filetree.view:get_marked()
 
   if (#to_copy == 0) then
@@ -323,7 +322,6 @@ function Mapping:keymap_copy()
       self.filetree:copy_file(node.path, new_path)
       if (Help:file_exists(new_path)) then
 	local created = dir_node:add_file(new_path)
-	self.filetree.view:render_node(created)
 	dir_node:sort()
       end
     end
@@ -336,6 +334,7 @@ end
 function Mapping:keymap_move()
   local selected = self.filetree.view:get_selected()
   local dir_node = self:get_node_tree(selected)
+  if (dir_node == nil) then return end
   local to_move = self.filetree.view:get_marked()
 
   if (#to_move == 0) then
@@ -355,7 +354,6 @@ function Mapping:keymap_move()
       if (Help:file_exists(new_path)) then
 	node:delete(node)
 	local created = dir_node:add_file(new_path)
-	self.filetree.view:render_node(created)
 	dir_node:sort()
       end
     end
@@ -406,7 +404,11 @@ function Mapping:keymap_toggle_hidden()
 end
 
 function Mapping:keymap_redraw()
-  self.filetree.view:full_redraw()
+  self.filetree.view:force_redraw()
+end
+
+function Mapping:keymap_reload()
+  self.filetree.tree:reload_recursive()
 end
 
 function Mapping:keymap_clear()

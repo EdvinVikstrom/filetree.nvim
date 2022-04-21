@@ -46,7 +46,6 @@ end
 function FileTree:setup_config()
   local conf = self.config
   conf.directory = (conf.directory or vim.fn.getcwd())
-  conf.node = (conf.node or {})
 end
 
 function FileTree:load_tree()
@@ -78,47 +77,6 @@ function FileTree:set_parent_as_root()
 
   self:set_directory(parent)
   return self:load_tree()
-end
-
----@param tree  Tree metatable
----@param file  file name
----@param events  table {rename, change}
-function FileTree:node_event_callback(tree, file, events)
-  local path = Help:make_path(tree.path, file)
-
-  local ignore = 0
-  for i, entry in ipairs(self.ignore_files) do
-    if (entry == path) then
-      ignore = i
-      break
-    end
-  end
-  if (ignore ~= 0) then
-    table.remove(self.ignore_files, ignore)
-    return
-  end
-
-  local node = tree:find_node(path)
-
-  local selected = self.view:get_selected()
-  if (events.change and node == nil) then
-    local created = tree:add_file(path)
-    self.view:render_node(created)
-    tree:sort()
-  elseif (events.rename) then
-    if (Help:file_exists(path)) then
-      local created = tree:add_file(path)
-      self.view:render_node(created)
-      tree:sort()
-    elseif (node ~= nil) then
-      node:delete()
-    end
-  end
-
-  if (selected ~= nil and selected ~= node) then
-    self.view:set_selected(selected)
-  end
-  self.view:redraw()
 end
 
 ---@param file  file to open in editor

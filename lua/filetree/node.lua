@@ -8,7 +8,6 @@ function Node:inherit()
   return self
 end
 
----@param conf  table with options {option = value, ...}. |filetree-config|
 ---@param name  file name
 ---@param path  file path
 ---@param parent  Tree metatable with path of file parent
@@ -37,7 +36,18 @@ function Node:new(name, path, parent, depth, type)
   self.tail = Help:get_file_extension(self.name)
 
   self.marked = false
+  self.changed = true
   return self
+end
+
+function Node:mark()
+  self.marked = true
+  self.changed = true
+end
+
+function Node:unmark()
+  self.marked = false
+  self.changed = true
 end
 
 function Node:delete()
