@@ -67,7 +67,7 @@ end
 
 function Mapping:autocmd_win_enter()
   if (self.filetree.view:is_active()) then
-    self.filetree.tree:reload_recursive()
+    self.filetree.tree:soft_reload_recursive()
     self.filetree.view:redraw()
   end
 end
@@ -237,7 +237,7 @@ function Mapping:keymap_make_file()
     local path = dir_node.path.."/"..name
     self.filetree:make_file(path)
     if (vim.fn.filereadable(path)) then
-      local created = dir_node:add_file(path)
+      local created = dir_node:add_node_by_path(path)
       dir_node:sort()
       self.filetree.view:redraw()
       self.filetree.view:set_selected(created)
@@ -256,7 +256,7 @@ function Mapping:keymap_make_directory()
     local path = dir_node.path.."/"..name
     self.filetree:make_directory(path)
     if (vim.fn.isdirectory(path)) then
-      local created = dir_node:add_file(path)
+      local created = dir_node:add_node_by_path(path)
       dir_node:sort()
       self.filetree.view:redraw()
       self.filetree.view:set_selected(created)
@@ -291,7 +291,7 @@ function Mapping:keymap_rename()
   self.filetree:move_file(selected.path, new_path)
   if (Help:file_exists(new_path)) then
     selected:delete()
-    local created = dir_node:add_file(new_path)
+    local created = dir_node:add_node_by_path(new_path)
     dir_node:sort()
     self.filetree.view:redraw()
     self.filetree.view:set_selected(created)
@@ -321,7 +321,7 @@ function Mapping:keymap_copy()
     if (continue) then
       self.filetree:copy_file(node.path, new_path)
       if (Help:file_exists(new_path)) then
-	local created = dir_node:add_file(new_path)
+	local created = dir_node:add_node_by_path(new_path)
 	dir_node:sort()
       end
     end
@@ -353,7 +353,7 @@ function Mapping:keymap_move()
       self.filetree:move_file(node.path, new_path)
       if (Help:file_exists(new_path)) then
 	node:delete(node)
-	local created = dir_node:add_file(new_path)
+	local created = dir_node:add_node_by_path(new_path)
 	dir_node:sort()
       end
     end
@@ -408,7 +408,7 @@ function Mapping:keymap_redraw()
 end
 
 function Mapping:keymap_reload()
-  self.filetree.tree:reload_recursive()
+  self.filetree.tree:soft_reload_recursive()
 end
 
 function Mapping:keymap_clear()

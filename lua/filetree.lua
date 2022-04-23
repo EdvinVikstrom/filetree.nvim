@@ -16,7 +16,6 @@ function FileTree:new(conf)
   self.view = View:new(self.config.view)
   self.mapping = Mapping:new(self, self.config.mapping)
   self.extensions = {}
-  self.ignore_files = {}
 
   self:setup_config()
 
@@ -99,17 +98,11 @@ end
 
 ---@param file  file path
 function FileTree:make_file(file)
-  if (self.config.node.event_callback ~= nil) then
-    table.insert(self.ignore_files, file)
-  end
   vim.fn.writefile({}, file, "b")
 end
 
 ---@param file  file path
 function FileTree:make_directory(file)
-  if (self.config.node.event_callback ~= nil) then
-    table.insert(self.ignore_files, file)
-  end
   vim.fn.mkdir(file)
 end
 
@@ -117,9 +110,6 @@ end
 ---@param dest  destination path
 -- TODO: better copy
 function FileTree:copy_file(file, dest)
-  if (self.config.node.event_callback ~= nil) then
-    table.insert(self.ignore_files, dest)
-  end
   local content = vim.fn.readfile(file, "b")
   vim.fn.writefile(content, dest, "b")
 end
@@ -127,18 +117,11 @@ end
 ---@param file  file to move
 ---@param path  new path name
 function FileTree:move_file(file, path)
-  if (self.config.node.event_callback ~= nil) then
-    table.insert(self.ignore_files, file)
-    table.insert(self.ignore_files, path)
-  end
   vim.fn.rename(file, path)
 end
 
 ---@param file  file to remove
 function FileTree:remove_file(file)
-  if (self.config.node.event_callback ~= nil) then
-    table.insert(self.ignore_files, file)
-  end
   vim.fn.delete(file, "rf")
 end
 

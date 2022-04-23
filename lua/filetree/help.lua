@@ -73,6 +73,23 @@ function Help:get_file_type(path)
   return type
 end
 
+function Help:read_directory(path)
+  local dir, err, err_name = vim.loop.fs_opendir(path, nil, 4000)
+  if (err ~= nil) then
+    print("failed to open directory:", err)
+    return nil
+  end
+
+  local files, err, err_name = vim.loop.fs_readdir(dir)
+  if (err ~= nil) then
+    print("failed to read directory:", err)
+    return nil
+  end
+
+  vim.loop.fs_closedir(dir)
+  return files
+end
+
 -- NOTE: if def is true then default is 'yes', otherwise 'no'
 function Help:get_user_yesno(msg, def)
   if (def) then
