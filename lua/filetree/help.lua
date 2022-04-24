@@ -1,4 +1,4 @@
-local Help = {}
+local Help = {sl_stack = {}}
 
 function Help:make_path(path, name)
   if (vim.endswith(path, "/")) then
@@ -109,6 +109,39 @@ end
 function Help:get_user_input(msg, def)
   local str = vim.fn.input({prompt = msg..": ", default = (def or ""), cancelreturn = ""})
   return str
+end
+
+function Help:push_status_line(win, line)
+  local self = Help
+  local old_line = vim.api.nvim_win_get_option(win, "statusline")
+  table.insert(self.sl_stack, {win = win, line = old_line})
+  vim.api.nvim_win_set_option(win, "statusline", line)
+end
+
+function Help:pop_status_line(win)
+  local self = Help
+  local index = 0
+  for i, item in ipairs(self.sl_stack) do
+    if (item.win == win) then
+      index = i
+      break
+    end
+  end
+
+  if (index == 0) then
+    return
+  end
+
+  vim.api.nvim_win_set_option(win, "statusline", self.sl_stack[index].line)
+  table.remove(self.sl_stack, index)
+end
+
+function Help:pop_status_lines()
+  local self = Help
+  for i, item in ipairs(self.sl_stack) do
+    vim.api.nvim_win_set_option(item.win, "statusline", item.line)
+  end
+  self.sl_stack = {}
 end
 
 return Help

@@ -48,7 +48,7 @@ end
 
 function Mapping:setup_keymaps()
   for key, map in pairs(self.config.keymaps) do
-    vim.keymap.set('n', key, function() map(self) end, {buffer = self.filetree.view.buf, silent = true})
+    vim.keymap.set("n", key, function() map(self) end, {buffer = self.filetree.view.buf, silent = true})
   end
 end
 

@@ -44,7 +44,8 @@ end
 
 function FileTree:setup_config()
   local conf = self.config
-  conf.directory = (conf.directory or vim.fn.getcwd())
+  conf.namespace = (conf.namespace or vim.api.nvim_create_namespace("filetree"))
+  self:set_directory(conf.directory or vim.fn.getcwd())
 end
 
 function FileTree:load_tree()
@@ -86,14 +87,40 @@ function FileTree:open_file(file)
   end
 
   local wins = vim.api.nvim_list_wins()
+  local suitable = {}
   for i, win in ipairs(wins) do
-    if (not(win == self.view.win)) then
-      vim.api.nvim_set_current_win(win)
-      break
+    if (win ~= self.view.win) then
+      table.insert(suitable, win)
     end
   end
 
-  vim.api.nvim_command("edit "..file)
+  if (#suitable > 1) then
+    local ids = {"a", "o", "e", "u"}
+    for i, win in ipairs(suitable) do
+      Help:push_status_line(win, "%=["..string.upper(ids[i]).."]%=")
+    end
+
+    local index = 0
+    while (index == 0) do
+      local input = Help:get_user_input("Pick window")
+      for i, id in ipairs(ids) do
+	if (vim.stricmp(id, input) == 0) then
+	  index = i
+	  break
+	end
+      end
+    end
+
+    vim.api.nvim_set_current_win(suitable[index])
+    vim.cmd("edit "..file)
+
+    Help:pop_status_lines()
+  elseif (#suitable == 0) then
+    vim.cmd("edit "..file)
+  else
+    vim.api.nvim_set_current_win(suitable[1])
+    vim.cmd("edit "..file)
+  end
 end
 
 ---@param file  file path
@@ -157,9 +184,15 @@ function FileTree:get_directory()
   return self.config.directory
 end
 
+---@returns home relative path to root tree
+function FileTree:get_rel_directory()
+  return self.config.rel_directory
+end
+
 ---@param path  new root directory path
 function FileTree:set_directory(path)
   self.config.directory = path
+  self.config.rel_directory = vim.fn.fnamemodify(path, ":p:~")
   vim.cmd("augroup filetree | doautocmd User dir_changed | augroup END")
 end
 

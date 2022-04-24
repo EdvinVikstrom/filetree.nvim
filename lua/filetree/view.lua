@@ -52,11 +52,12 @@ function View:open_window()
     vim.api.nvim_command("wincmd r")
   end
 
+  vim.api.nvim_win_set_width(self.win, self.config.width)
+  vim.api.nvim_win_set_buf(self.win, self.buf)
   vim.api.nvim_win_set_option(self.win, "wrap", false)
   vim.api.nvim_win_set_option(self.win, "number", false)
   vim.api.nvim_win_set_option(self.win, "relativenumber", false)
-  vim.api.nvim_win_set_width(self.win, self.config.width)
-  vim.api.nvim_win_set_buf(self.win, self.buf)
+  vim.api.nvim_win_set_option(self.win, "fillchars", "eob: ")
 
   self:force_redraw()
 end
@@ -208,17 +209,17 @@ end
 
 ---@param node  Node metatable
 function View:set_selected(node)
-  vim.fn.cursor(node.index + self.config.cursor_offset, 0)
+  self:set_cursor(node.index)
 end
 
 ---@returns cursor position relative to nodes
 function View:get_cursor()
-  return vim.fn.line(".") - self.config.cursor_offset
+  return vim.api.nvim_win_get_cursor(self.win)[1] - self.config.cursor_offset
 end
 
 ---@param line  line number
 function View:set_cursor(line)
-  vim.fn.cursor(line + self.config.cursor_offset, 0)
+  vim.api.nvim_win_set_cursor(self.win, {line + self.config.cursor_offset, 0})
 end
 
 ---returns number of nodes in buffer

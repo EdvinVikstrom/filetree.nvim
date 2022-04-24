@@ -3,8 +3,6 @@ Requires Neovim 0.7+
 
 ### Example conifg file
 ```
--- 'init.lua'
-
 local FileTree = require("filetree")
 local Mapping = FileTree.Mapping
 FileTree:setup({
