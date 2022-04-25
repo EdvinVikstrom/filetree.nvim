@@ -8,11 +8,11 @@ function Node:inherit()
   return self
 end
 
----@param name  file name
----@param path  file path
+---@param name    file name
+---@param path    file path
 ---@param parent  Tree metatable with path of file parent
----@param depth  directory level
----@param type  file type
+---@param depth   directory level
+---@param type    file type
 ---@returns Node metatable
 function Node:new(name, path, parent, depth, type)
   local self = setmetatable({}, { __index = Node })

@@ -189,10 +189,11 @@ function View:render_callback(node)
   end
 end
 
+---@param node       node to add highlight
 ---@param namespace  highlight namespace
----@param group  highlight group name
----@param first  first column
----@param last  last column
+---@param group      highlight group name
+---@param first      first column
+---@param last       last column
 function View:add_highlight(node, namespace, group, first, last)
   table.insert(node.hl, {namespace = namespace, group = group, first = first, last = last})
 end

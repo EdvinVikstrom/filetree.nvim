@@ -3,7 +3,7 @@ local Mapping = {}
 local Help = require("filetree.help")
 
 ---@param filetree  FileTree metatable
----@param conf  table with options {option = value, ...}. |filetree-config|
+---@param conf      table with options {option = value, ...}. |filetree-config|
 ---@returns Mapping metatable
 function Mapping:new(filetree, conf)
   local self = setmetatable({}, { __index = Mapping })
@@ -238,6 +238,9 @@ function Mapping:keymap_make_file()
     self.filetree:make_file(path)
     if (vim.fn.filereadable(path)) then
       local created = dir_node:add_node_by_path(path)
+      if (created:is_hidden()) then
+	self.filetree.view.config.show_hidden = true
+      end
       dir_node:sort()
       self.filetree.view:redraw()
       self.filetree.view:set_selected(created)
@@ -257,6 +260,9 @@ function Mapping:keymap_make_directory()
     self.filetree:make_directory(path)
     if (vim.fn.isdirectory(path)) then
       local created = dir_node:add_node_by_path(path)
+      if (created:is_hidden()) then
+	self.filetree.view.config.show_hidden = true
+      end
       dir_node:sort()
       self.filetree.view:redraw()
       self.filetree.view:set_selected(created)
@@ -292,6 +298,9 @@ function Mapping:keymap_rename()
   if (Help:file_exists(new_path)) then
     selected:delete()
     local created = dir_node:add_node_by_path(new_path)
+    if (created:is_hidden()) then
+      self.filetree.view.config.show_hidden = true
+    end
     dir_node:sort()
     self.filetree.view:redraw()
     self.filetree.view:set_selected(created)

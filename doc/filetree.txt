@@ -1,1 +1,338 @@
-nothing here
+*filetree.nvim* *filetree*
+
+File manager for Neovim written in Lua.
+
+==============================================================================
+CONTENTS                                                     *filetree-contents*
+
+Setup                                                           |filetree-setup|
+Commands                                                     |filetree-commands|
+Config                                                         |filetree-config|
+View                                                             |filetree-view|
+Mapping                                                       |filetree-mapping|
+Node                                                             |filetree-node|
+
+==============================================================================
+SETUP                                                           *filetree-setup*
+
+Example config: >
+
+  local FileTree = require("filetree")
+  local Mapping = FileTree.Mapping
+  FileTree:setup({
+    view = {
+      position = "right",
+      width = 40,
+      show_hidden = false,
+      symbols = {
+        tree_expanded = '',
+        tree_closed = ''
+      }
+    },
+  
+    mapping = {
+      wrap_cursor = true,
+      close_children = true,
+      keymaps = {
+        ["j"] = Mapping:cursor_down(),
+        ["k"] = Mapping:cursor_up(),
+        ["l"] = Mapping:open(),
+        ["h"] = Mapping:close(),
+        ["<Enter>"] = Mapping:enter(),
+        ["w"] = Mapping:mark(false),
+        ["W"] = Mapping:mark(true),
+        ["N"] = Mapping:make_file(),
+        ["K"] = Mapping:make_directory(),
+        ["r"] = Mapping:rename(),
+        ["c"] = Mapping:copy(),
+        ["m"] = Mapping:move(),
+        ["x"] = Mapping:remove(),
+        ["."] = Mapping:toggle_hidden(),
+        [","] = Mapping:redraw(),
+        [";"] = Mapping:reload(),
+        ["<Esc>"] = Mapping:clear()
+      }
+    },
+  
+    extensions = {"icons"}
+  })
+
+==============================================================================
+COMMANDS                                                     *filetree-commands*
+
+                                                            *filetree-FTreeOpen*
+:FTreeOpen                         Opens a new file tree window.
+
+                                                           *filetree-FTreeClose*
+:FTreeClose                        Closes current file tree window.
+
+==============================================================================
+CONFIG                                                         *filetree-config*
+
+namespace~
+  `string`
+  I don't know what this is for.
+
+win_ids~
+  `table`
+  Ids to use when picking a window. |filetree-open_file|
+  (default: {"a", "o", "e", "u", "h", "t", "n", "s"})
+
+directory~
+  `string`
+  Root directory of the file tree.
+  (default: current working directory)
+
+extensions~
+  `table`
+  List of extensions to enable.
+  Available extensions are:
+    `icons`, `statline`
+
+view.cursor_offset~
+  `number`
+  Offset when selecting a node.
+  (default: 0)
+
+view.position~
+  `string` {"west", "east", "south", "north"}
+  Position of window.
+  (default: "west")
+
+view.width~
+  `number`
+  Window width.
+  (default: 40)
+
+view.line_width~
+  `number`
+  Relative width of node line.
+  (default: 6)
+
+view.show_hidden~
+  `boolean`
+  Show files starting with a `.` (dot).
+  (default: false)
+
+view.symbols~
+  `table`
+  Table of symbols to use when rendering file tree.
+  (default: {} see below)
+
+view.symbols.tree_expanded~
+  `string`
+  Symbol when a node is expanded.
+  (default: "v")
+
+view.symbols.tree_closed~
+  `string`
+  Symbol when a node is closed.
+  (default: ">")
+
+view.hl~
+  `table`
+  Table of highlight groups to use when rendering file tree.
+  (default: {} see below)
+
+view.hl.namespace~
+  `number`
+  Highlight namespace.
+  (default: n/a)
+
+view.hl.directory~
+  `string`
+  Highlight group for directories.
+  (default: "dir")
+
+view.hl.file~
+  `string`
+  Highlight group for files.
+  (default: "file")
+
+view.hl.render_callback~
+  `function`
+  Callback when a node needs to render.
+  Can have 2 parameters:
+    view |filetree-view|
+    node |filetree-node|
+
+  Example: >
+
+    function(view, node)
+      view:render_callback(node)
+
+      if (node.rtype == "directory") then
+	node.text = node.text.." DIR"
+      else
+	node.text = node.text.." FILE"
+      end
+    end
+
+mapping.wrap_cursor~
+  `boolean`
+  Sets the cursor at the top if reached bottom and sets
+  cursor at bottom if reached top.
+  (default: false)
+
+mapping.close_children~
+  `boolean`
+  Closes all children when closing a tree.
+  (default: true)
+
+mapping.keymaps~
+  `table`
+  Table of key mappings. See |filetree-mapping|
+  
+  Example: >
+
+    {
+      ["<C-Space>"] = Mapping:toggle_hidden()
+    }
+
+==============================================================================
+VIEW                                                             *filetree-view*
+
+Class that handles all the rendering.
+
+View:render_callback()                         *filetree-view-render_callback()*
+  Default node rendering function.
+
+  Parameters:~
+    {node}  |filetree-node| Node to render.
+
+View:add_highlight()                             *filetree-view-add_highlight()*
+  Adds highlight to a node.
+
+  Parameters:~
+    {node}       |filetree-node| Node to highlight.
+    {namespace}  number Highlight namespace.
+    {group}      string Highlight group.
+    {first}      number First column to higlight.
+    {last}       number Last column to highlight.
+
+View:get_cursor()                                   *filetree-view-get_cursor()*
+
+  Returns:~
+    Line position.
+
+View:set_cursor()                                   *filetree-view-set_cursor()*
+  
+  Parameters:~
+    {line}  number Line position.
+
+View:get_node_count()                           *filetree-view-get_node_count()*
+
+  Returns:~
+    Number of nodes being drawn.
+
+View:get_marked()                                   *filetree-view-get_marked()*
+
+    Returns:~
+      Table of node that are marked.
+
+View:add_marked()                                   *filetree-view-add_marked()*
+  Adds node to marked nodes.
+
+  Parameters:~
+    {node}  |filetree-node| Node to add to marked nodes.
+
+View:remove_marked()                             *filetree-view-remove_marked()*
+  Removes node from marked nodes.
+
+  Parameters:~
+    {node}  |filetree-node| Node to remove from marked nodes.
+
+View:clear_marked()                               *filetree-view-clear_marked()*
+    Removes all marked nodes.
+
+View:is_active()                                     *filetree-view-is_active()*
+  Check if window is active.
+
+  Returns:~
+    True if window is available.
+
+==============================================================================
+MAPPING                                                       *filetree-mapping*
+
+Class that handles all the key mappings.
+
+Mapping:cursor_down()                           *filetree-mapping-cursor_down()*
+    Moves cursor down in the file tree.
+
+Mapping:cursor_up()                               *filetree-mapping-cursor_up()*
+    Moves cursor up in the file tree.
+
+Mapping:open()                                         *filetree-mapping-open()*
+    Expands node if directory, otherwise opens file in a window.
+
+Mapping:close()                                       *filetree-mapping-close()*
+    Closes node if directory or closes parent node.
+
+Mapping:enter()                                       *filetree-mapping-enter()*
+    Changes the root directory if directory, otherwise opens file in a window.
+
+Mapping:mark()                                         *filetree-mapping-mark()*
+    @param reverse  `boolean` moves cursor in reverse
+    Adds selected node to marked nodes.
+
+    Parameters:~
+      {reverse}  boolean Moves cursor up if true.
+
+Mapping:make_file()                               *filetree-mapping-make_file()*
+    Asks user for a file name and then creates the file.
+
+Mapping:make_directory()                     *filetree-mapping-make_directory()*
+    Asks user for a directory name and then creates the directory.
+
+Mapping:rename()                                     *filetree-mapping-rename()*
+    Asks the user for a new file name and renames selected file.
+
+Mapping:copy()                                         *filetree-mapping-copy()*
+    Copy marked files to current parent node.
+
+Mapping:move()                                         *filetree-mapping-move()*
+    Move marked files to current parent node.
+
+Mapping:remove()                                     *filetree-mapping-rename()*
+    Removes selected/marked files.
+
+Mapping:toggle_hidden()                       *filetree-mapping-toggle_hidden()*
+    Toggle hiddens files to render or not.
+
+Mapping:redraw()                                     *filetree-mapping-redraw()*
+    Redraw file tree.
+
+Mapping:reload()                                     *filetree-mapping-reload()*
+    Reload file tree.
+
+Mapping:clear()                                       *filetree-mapping-clear()*
+    Clear marked nodes.
+
+==============================================================================
+NODE                                                             *filetree-node*
+
+Node is a class with variables:
+  {name, path, parent, depth, type}
+
+Node:new()
+  Creates a new node.
+  
+  Parameters:~
+    {name}    string File name.
+    {path}    string File path.
+    {parent}  |filetree-node| Parent of this node.
+    {depth}   number Directory level.
+    {type}    string File type.
+
+  Returns:~
+    Node metatable.
+
+Node:delete()
+  Deletes node from parent node.
+
+Node:is_hidden()
+
+  Returns:~
+    True if name starts with a `.` (dot).
+
+ vim:tw=78:ts=8:ft=help:norl:

@@ -6,7 +6,6 @@ Requires Neovim 0.7+
 local FileTree = require("filetree")
 local Mapping = FileTree.Mapping
 FileTree:setup({
-
   view = {
     position = "right",
     width = 40,
@@ -41,7 +40,6 @@ FileTree:setup({
   },
 
   extensions = {"icons"}
-
 })
 vim.cmd("FTreeOpen")
 ```

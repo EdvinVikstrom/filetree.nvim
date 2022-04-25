@@ -45,6 +45,7 @@ end
 function FileTree:setup_config()
   local conf = self.config
   conf.namespace = (conf.namespace or vim.api.nvim_create_namespace("filetree"))
+  conf.win_ids = (conf.win_ids or {"a", "o", "e", "u", "h", "t", "n", "s"})
   self:set_directory(conf.directory or vim.fn.getcwd())
 end
 
@@ -90,14 +91,20 @@ function FileTree:open_file(file)
   local suitable = {}
   for i, win in ipairs(wins) do
     if (win ~= self.view.win) then
+      if (#suitable >= #self.config.win_ids) then
+	break
+      end
       table.insert(suitable, win)
     end
   end
 
   if (#suitable > 1) then
-    local ids = {"a", "o", "e", "u"}
+    local ids = self.config.win_ids
+
     for i, win in ipairs(suitable) do
-      Help:push_status_line(win, "%=["..string.upper(ids[i]).."]%=")
+      local sl = vim.api.nvim_win_get_option(win, "statusline")
+      vim.api.nvim_win_set_option(win, "statusline", "%=["..ids[i].."]%=")
+      suitable[i] = {win = win, sl = sl}
     end
 
     local index = 0
@@ -111,10 +118,12 @@ function FileTree:open_file(file)
       end
     end
 
-    vim.api.nvim_set_current_win(suitable[index])
-    vim.cmd("edit "..file)
+    for i, item in ipairs(suitable) do
+      vim.api.nvim_win_set_option(item.win, "statusline", item.sl)
+    end
 
-    Help:pop_status_lines()
+    vim.api.nvim_set_current_win(suitable[index].win)
+    vim.cmd("edit "..file)
   elseif (#suitable == 0) then
     vim.cmd("edit "..file)
   else
