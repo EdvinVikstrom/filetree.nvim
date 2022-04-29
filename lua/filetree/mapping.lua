@@ -12,6 +12,20 @@ function Mapping:new(filetree, conf)
   return self
 end
 
+function Mapping:destroy()
+  if (self.autocmds ~= nil) then
+    for i, map in ipairs(self.autocmds) do
+      vim.api.nvim_del_autocmd(map.id)
+    end
+  end
+
+  if (self.keymaps ~= nil) then
+    for i, map in ipairs(self.keymaps) do
+      vim.keymap.del(map.modes, map.lhs, {buffer = map.opts.buffer})
+    end
+  end
+end
+
 function Mapping:setup_config()
   local conf = self.config
   if (conf.wrap_cursor == nil) then conf.wrap_cursor = false end
@@ -21,16 +35,15 @@ end
 
 function Mapping:setup_mappings()
   self.autocmds = {
-    { event = "VimEnter", pattern = "*", callback = function() self:autocmd_vim_enter() end },
-    { event = "VimLeave", pattern = "*", callback = function() self:autocmd_vim_leave() end },
-    { event = "VimResized", pattern = "*", callback = function() self:autocmd_vim_resized() end },
-    { event = "WinEnter", pattern = self.filetree.view.win, callback = function() self:autocmd_win_enter() end },
-    { event = "WinScrolled", pattern = self.filetree.view.win, callback = function() self:autocmd_win_scrolled() end },
-    { event = "User", pattern = "dir_changed", callback = function() self:autocmd_user_dir_changed() end }
+    { event = "VimEnter", callback = function(info) self:autocmd_vim_enter(info) end },
+    { event = "VimLeave", callback = function(info) self:autocmd_vim_leave(info) end },
+    { event = "VimResized", callback = function(info) self:autocmd_vim_resized(info) end },
+    { event = "WinEnter", callback = function(info) self:autocmd_win_enter(info) end },
+    { event = "WinScrolled", callback = function(info) self:autocmd_win_scrolled(info) end },
+    { event = "BufWinEnter", callback = function(info) self:autocmd_buf_win_enter(info) end },
+    { event = "WinClosed", callback = function(info) self:autocmd_win_closed(info) end },
+    { event = "User", pattern = "dir_changed", callback = function(info) self:autocmd_user_dir_changed(info) end }
   }
-
-  vim.cmd("command FTreeOpen lua _G.filetree.view:open_window()")
-  vim.cmd("command FTreeClose lua _G.filetree.view:close_window()")
 end
 
 function Mapping:setup_autocmds()
@@ -47,8 +60,14 @@ function Mapping:setup_autocmds()
 end
 
 function Mapping:setup_keymaps()
+  self.keymaps = {}
   for key, map in pairs(self.config.keymaps) do
-    vim.keymap.set("n", key, function() map(self) end, {buffer = self.filetree.view.buf, silent = true})
+    local opts = {
+      buffer = self.filetree.view.buf,
+      silent = true
+    }
+    vim.keymap.set("n", key, function() map(self) end, opts)
+    table.insert(self.keymaps, {modes = "n", lhs = key, opts = opts})
   end
 end
 
@@ -65,17 +84,32 @@ function Mapping:autocmd_vim_resized()
   self.filetree.view:force_redraw()
 end
 
-function Mapping:autocmd_win_enter()
+function Mapping:autocmd_win_enter(info)
+  local win = vim.api.nvim_get_current_win()
+  if (not(self.filetree.view:is_active()) or win ~= self.filetree.view.win) then return end
   if (self.filetree.view:is_active()) then
     self.filetree.tree:soft_reload_recursive()
     self.filetree.view:redraw()
   end
 end
 
-function Mapping:autocmd_win_scrolled()
+function Mapping:autocmd_win_scrolled(info)
+  local win = vim.api.nvim_get_current_win()
+  if (not(self.filetree.view:is_active()) or win ~= self.filetree.view.win) then return end
   if (self.filetree.view:should_redraw()) then
     self.filetree.view:force_redraw()
   end
+end
+
+function Mapping:autocmd_buf_win_enter(info)
+  local win = vim.api.nvim_get_current_win()
+  if (not(self.filetree.view:is_active()) or win ~= self.filetree.view.win) then return end
+  vim.api.nvim_win_set_buf(self.filetree.view.win, self.filetree.view.buf)
+end
+
+function Mapping:autocmd_win_closed(info)
+  if (not(self.filetree.view:is_active()) or info.match ~= ""..self.filetree.view.win) then return end
+  self.filetree.view.win = nil
 end
 
 function Mapping:autocmd_user_dir_changed()
@@ -155,7 +189,7 @@ function Mapping:keymap_open()
 
   if (selected.rtype == "directory") then
     if (selected.expanded) then
-      selected:close()
+      selected:close(self.config.close_children)
       self.filetree.view:redraw()
     else
       selected:expand()

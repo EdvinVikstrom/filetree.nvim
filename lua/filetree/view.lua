@@ -11,12 +11,17 @@ function View:new(conf)
   return self
 end
 
-function View:setup_highlight()
-  self.hlns = vim.api.nvim_create_namespace("filetree")
+function View:destroy()
+  self:close_window()
+  if (self.buf ~= nil) then
+    vim.api.nvim_buf_delete(self.buf, {force = true})
+  end
+end
 
-  vim.api.nvim__set_hl_ns(self.hlns)
-  vim.cmd("hi dir ctermfg=blue")
-  vim.cmd("hi file ctermfg=white")
+function View:setup_highlight()
+  vim.cmd("hi filetree_expanded_dir ctermfg=208")
+  vim.cmd("hi filetree_dir ctermfg=223")
+  vim.cmd("hi filetree_file ctermfg=246")
 end
 
 function View:setup_config()
@@ -27,12 +32,14 @@ function View:setup_config()
   conf.line_width = (conf.line_width or 6)
   conf.show_hidden = (conf.show_hidden or false)
   conf.symbols = (conf.symbols or {})
+  conf.symbols.file = (conf.symbols.file or "-")
   conf.symbols.tree_expanded = (conf.symbols.tree_expanded or "v")
   conf.symbols.tree_closed = (conf.symbols.tree_closed or ">")
   conf.hl = (conf.hl or {})
-  conf.hl.namespace = (conf.hl.namespace or self.hlns)
-  conf.hl.directory = (conf.hl.directory or "dir")
-  conf.hl.file = (conf.hl.file or "file")
+  if (conf.hl.namespace == nil) then conf.hl.namespace = 0 end
+  conf.hl.expanded_directory = (conf.hl.expanded_directory or "filetree_expanded_dir")
+  conf.hl.directory = (conf.hl.directory or "filetree_dir")
+  conf.hl.file = (conf.hl.file or "filetree_file")
   conf.render_callback = (conf.render_callback or function(view, node) view:render_callback(node) end)
 end
 
@@ -144,7 +151,7 @@ end
 
 ---@param node  Node metatable
 function View:render_callback(node)
-  local head = "- "
+  local head = self.config.symbols.file.." "
   if (node.rtype == "directory") then
     if (node.expanded) then
       head = self.config.symbols.tree_expanded.." "
@@ -179,7 +186,11 @@ function View:render_callback(node)
   -- highlight
   local len = node.depth + #node.text
   if (node.rtype == "directory") then
-    self:add_highlight(node, self.config.hl.namespace, self.config.hl.directory, 0, len)
+    if (node.expanded) then
+      self:add_highlight(node, self.config.hl.namespace, self.config.hl.expanded_directory, 0, len)
+    else
+      self:add_highlight(node, self.config.hl.namespace, self.config.hl.directory, 0, len)
+    end
   else
     self:add_highlight(node, self.config.hl.namespace, self.config.hl.file, 0, len)
   end

@@ -11,6 +11,7 @@ Config                                                         |filetree-config|
 View                                                             |filetree-view|
 Mapping                                                       |filetree-mapping|
 Node                                                             |filetree-node|
+Extensions                                                 |filetree-extensions|
 
 ==============================================================================
 SETUP                                                           *filetree-setup*
@@ -78,16 +79,29 @@ win_ids~
   Ids to use when picking a window. |filetree-open_file|
   (default: {"a", "o", "e", "u", "h", "t", "n", "s"})
 
+change_dir~
+  `boolean`
+  Changes current working directory when entering a tree.
+  (default: false)
+
 directory~
   `string`
   Root directory of the file tree.
   (default: current working directory)
+
+file_callback~
+  `function`
+  Callback when trying to open selected file.
+  Can have 1 parameters:
+    file `string`
 
 extensions~
   `table`
   List of extensions to enable.
   Available extensions are:
     `icons`, `statline`
+
+  See: |filetree-extensions|
 
 view.cursor_offset~
   `number`
@@ -119,6 +133,11 @@ view.symbols~
   Table of symbols to use when rendering file tree.
   (default: {} see below)
 
+view.symbols.file~
+  `string`
+  Symbol for a file.
+  (default: "-")
+
 view.symbols.tree_expanded~
   `string`
   Symbol when a node is expanded.
@@ -137,17 +156,22 @@ view.hl~
 view.hl.namespace~
   `number`
   Highlight namespace.
-  (default: n/a)
+  (default: 0)
+
+view.hl.expanded_directory~
+  `string`
+  Highlight group for expanded directory.
+  (default: "filetree_expanded_dir")
 
 view.hl.directory~
   `string`
   Highlight group for directories.
-  (default: "dir")
+  (default: "filetree_dir")
 
 view.hl.file~
   `string`
   Highlight group for files.
-  (default: "file")
+  (default: "filetree_file")
 
 view.hl.render_callback~
   `function`
@@ -334,5 +358,15 @@ Node:is_hidden()
 
   Returns:~
     True if name starts with a `.` (dot).
+
+==============================================================================
+EXTENSIONS                                                 *filetree-extensions*
+
+icons~
+  Fancy icons for file types.
+
+statline~
+  Shows info about the tree in the `statline` plugin.
+  https://gitlab.com/EdvinVikstrom/statline.nvim
 
  vim:tw=78:ts=8:ft=help:norl:

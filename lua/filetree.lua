@@ -28,7 +28,7 @@ function FileTree:new(conf)
   self.mapping:setup_autocmds()
   self.mapping:setup_keymaps()
 
-  if (not(conf.extensions == nil)) then
+  if (conf.extensions ~= nil) then
     for i, ext in ipairs(conf.extensions) do
       if (type(ext) == "table") then
 	self:enable_extension(ext.name, ext.conf)
@@ -39,14 +39,25 @@ function FileTree:new(conf)
   end
   self:load_extensions()
   self:load_tree()
+
+  vim.cmd("command FTreeOpen lua _G.filetree:open()")
+  vim.cmd("command FTreeClose lua _G.filetree:close()")
   return self
+end
+
+function FileTree:destroy()
+  self.mapping:destroy()
+  self.view:destroy()
 end
 
 function FileTree:setup_config()
   local conf = self.config
   conf.namespace = (conf.namespace or vim.api.nvim_create_namespace("filetree"))
   conf.win_ids = (conf.win_ids or {"a", "o", "e", "u", "h", "t", "n", "s"})
-  self:set_directory(conf.directory or vim.fn.getcwd())
+  if (conf.change_dir == nil) then conf.change_dir = false end
+  conf.directory = (conf.directory or vim.fn.getcwd())
+  conf.file_callback = (conf.file_callback or function(file) return self:open_file_callback(file) end)
+  self:set_directory(conf.directory)
 end
 
 function FileTree:load_tree()
@@ -65,6 +76,10 @@ function FileTree:set_root(tree)
     return false
   end
 
+  if (self.config.change_dir) then
+    vim.api.nvim_set_current_dir(tree.path)
+  end
+
   self.tree = tree
   self.view:set_tree(self.tree)
   return true
@@ -80,13 +95,25 @@ function FileTree:set_parent_as_root()
   return self:load_tree()
 end
 
----@param file  file to open in editor
+function FileTree:open()
+  if (not self.view:is_active()) then
+    self.view:open_window()
+  end
+end
+
+function FileTree:close()
+  self.view:close_window()
+end
+
+---@param file  file to open
 function FileTree:open_file(file)
   if (not(self.config.file_callback == nil)) then
-    self.config.file_callback(file)
-    return
+    return self.config.file_callback(file)
   end
+end
 
+---@param file  file to open in editor
+function FileTree:open_file_callback(file)
   local wins = vim.api.nvim_list_wins()
   local suitable = {}
   for i, win in ipairs(wins) do

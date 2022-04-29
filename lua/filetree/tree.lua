@@ -39,6 +39,7 @@ end
 
 function Tree:close_recursive()
   self.expanded = false
+  self.changed = true
   for i, node in ipairs(self.children) do
     if (node.rtype == "directory") then
       node:close_recursive()
