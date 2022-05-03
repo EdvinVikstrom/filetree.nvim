@@ -5,6 +5,7 @@ local ExtIcons = Extension:inherit()
 ---@returns ExtIcons metatable
 function ExtIcons:new(conf)
   local self = setmetatable(Extension:new("icons", conf), { __index = ExtIcons })
+  self.config = (conf or {})
   return self
 end
 
@@ -16,17 +17,23 @@ function ExtIcons:setup_highlight()
     else
       vim.cmd("hi "..name.." ctermfg="..icon.hl.fg)
     end
-    icon.hl_name = name
+    icon.hlns = 0
+    icon.hlg = name
   end
 end
 
 function ExtIcons:setup_config()
+  local conf = self.config
+  conf.position = (conf.position or "last")
 end
 
 ---@param filetree  FileTree metatable
 function ExtIcons:init(filetree)
-  self.render_callback = self:setup_render_callback(filetree)
-  filetree.view.config.render_callback = self.render_callback
+  if (self.config.position == "last") then
+    filetree.view.config.file_exts.callback = function(node) return ExtIcons:get_icon(node) end
+  else
+    filetree.view.config.file_symbols.callback = function(node) return ExtIcons:get_icon(node) end
+  end
 end
 
 ---@param filetree  FileTree metatable
@@ -77,9 +84,9 @@ function ExtIcons:setup_icons()
   self.icons = {
     default = 			{symbol = "", hl = "filetree_file"},
     dir = 			{symbol = "", hl = "filetree_dir"},
-    dir_open = 			{symbol = "", hl = "filetree_expanded_dir"},
+    dir_open = 			{symbol = "", hl = "filetree_dir_expanded"},
     link_dir = 			{symbol = "", hl = "filetree_dir"},
-    link_dir_open = 		{symbol = "", hl = "filetree_expanded_dir"},
+    link_dir_open = 		{symbol = "", hl = "filetree_dir_expanded"},
     c = 			{symbol = "", hl = {fg = 66}},
     cpp = 			{symbol = "", hl = {fg = 66}},
     vim = 			{symbol = "", hl = {fg = 106}},

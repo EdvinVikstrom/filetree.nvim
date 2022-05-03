@@ -4,8 +4,7 @@ local View = {}
 ---@returns View metatable
 function View:new(conf)
   local self = setmetatable({}, { __index = View })
-  self.config = (conf or {})
-
+  self.config = conf
   self.nodes = {}
   self.marked_nodes = {}
   return self
@@ -16,31 +15,6 @@ function View:destroy()
   if (self.buf ~= nil) then
     vim.api.nvim_buf_delete(self.buf, {force = true})
   end
-end
-
-function View:setup_highlight()
-  vim.cmd("hi filetree_expanded_dir ctermfg=208")
-  vim.cmd("hi filetree_dir ctermfg=223")
-  vim.cmd("hi filetree_file ctermfg=246")
-end
-
-function View:setup_config()
-  local conf = self.config
-  conf.cursor_offset = 0
-  conf.position = (conf.position or "left")
-  conf.width = (conf.width or 40)
-  conf.line_width = (conf.line_width or 6)
-  conf.show_hidden = (conf.show_hidden or false)
-  conf.symbols = (conf.symbols or {})
-  conf.symbols.file = (conf.symbols.file or "-")
-  conf.symbols.tree_expanded = (conf.symbols.tree_expanded or "v")
-  conf.symbols.tree_closed = (conf.symbols.tree_closed or ">")
-  conf.hl = (conf.hl or {})
-  if (conf.hl.namespace == nil) then conf.hl.namespace = 0 end
-  conf.hl.expanded_directory = (conf.hl.expanded_directory or "filetree_expanded_dir")
-  conf.hl.directory = (conf.hl.directory or "filetree_dir")
-  conf.hl.file = (conf.hl.file or "filetree_file")
-  conf.render_callback = (conf.render_callback or function(view, node) view:render_callback(node) end)
 end
 
 function View:setup_buffer()
@@ -123,7 +97,7 @@ end
 
 ---@private
 function View:draw_node(node)
-  if (node:is_hidden() and not(self.config.show_hidden)) then
+  if (node:is_dot_file() and not(self.config.show_dot_files)) then
     return
   end
 
@@ -134,7 +108,7 @@ function View:draw_node(node)
 
   table.insert(self.lines, node.text)
 
-  if (node.expanded) then
+  if (node.expanded and #node.children ~= 0) then
     self:draw_tree(node)
   end
 end
@@ -144,60 +118,134 @@ function View:render_node(node)
   if (node.changed) then
     node.text = ""
     node.hl = {}
-    self.config.render_callback(self, node)
+    self:render_line(node)
     node.changed = false
   end
 end
 
 ---@param node  Node metatable
-function View:render_callback(node)
-  local head = self.config.symbols.file.." "
+function View:render_line(node)
+  if (self.config.render_callback ~= nil and self.config.render_callback(node)) then
+    return
+  end
+
+  local symbol = nil
+  local name = nil
+  local ext = nil
+
+  if (self.config.file_symbols.callback ~= nil) then
+    symbol = self.config.file_symbols.callback(node)
+  end
+
+  if (self.config.file_names.callback ~= nil) then
+    name = self.config.file_names.callback(node)
+  end
+
+  if (self.config.file_exts.callback ~= nil) then
+    ext = self.config.file_exts.callback(node)
+  end
+
   if (node.rtype == "directory") then
     if (node.expanded) then
-      head = self.config.symbols.tree_expanded.." "
-      node.text = head..node.name..'/'
+      if (node.type == "link") then
+	symbol = (symbol or self.config.file_symbols.link_dir_expanded)
+	name = (name or self.config.file_names.link_dir_expanded)
+	ext = (ext or self.config.file_exts.link_dir_expanded)
+      else
+	symbol = (symbol or self.config.file_symbols.dir_expanded)
+	name = (name or self.config.file_names.dir_expanded)
+	ext = (ext or self.config.file_exts.dir_expanded)
+      end
     else
-      head = self.config.symbols.tree_closed.." "
-      node.text = head..node.name..'/'
+      if (node.type == "link") then
+	symbol = (symbol or self.config.file_symbols.link_dir)
+	name = (name or self.config.file_names.link_dir)
+	ext = (ext or self.config.file_exts.link_dir)
+      else
+	symbol = (symbol or self.config.file_symbols.dir)
+	name = (name or self.config.file_names.dir)
+	ext = (ext or self.config.file_exts.dir)
+      end
     end
   elseif (node.rtype == "link") then
-    node.text = head..node.name.."@"
+    symbol = (symbol or self.config.file_symbols.link)
+    name = (name or self.config.file_names.link)
+    ext = (ext or self.config.file_exts.link)
   elseif (node.rtype == "block") then
-    node.text = head..node.name.."#"
+    symbol = (symbol or self.config.file_symbols.block)
+    name = (name or self.config.file_names.block)
+    ext = (ext or self.config.file_exts.block)
   elseif (node.rtype == "char") then
-    node.text = head..node.name.."%"
+    symbol = (symbol or self.config.file_symbols.char)
+    name = (name or self.config.file_names.char)
+    ext = (ext or self.config.file_exts.char)
   elseif (node.rtype == "socket") then
-    node.text = head..node.name.."="
+    symbol = (symbol or self.config.file_symbols.socket)
+    name = (name or self.config.file_names.socket)
+    ext = (ext or self.config.file_exts.socket)
   elseif (node.rtype == "fifo") then
-    node.text = head..node.name.."|"
+    symbol = (symbol or self.config.file_symbols.fifo)
+    name = (name or self.config.file_names.fifo)
+    ext = (ext or self.config.file_exts.fifo)
   else
-    node.text = head..node.name
+    symbol = (symbol or self.config.file_symbols.file)
+    name = (name or self.config.file_names.file)
+    ext = (ext or self.config.file_exts.file)
   end
+
+  symbol = (symbol or self.config.file_symbols.__default)
+  name = (name or self.config.file_names.__default)
+  ext = (ext or self.config.file_exts.__default)
+
+  local head = symbol.symbol.." "
+  local tail = ext.symbol.." "
+  node.text = head..node.name..name.suffix
+
   if (node.marked) then
     node.text = node.text.." *"
   end
-  node.name_offset = #head
 
-  local width = self.width - self.config.line_width
+  local depth2 = node.depth * self.config.indent
+  local indent = ""
 
-  -- offset text
-  node.text = string.rep(" ", node.depth)..node.text
-
-  -- highlight
-  local len = node.depth + #node.text
-  if (node.rtype == "directory") then
-    if (node.expanded) then
-      self:add_highlight(node, self.config.hl.namespace, self.config.hl.expanded_directory, 0, len)
+  -- indent markers
+  if (self.config.indent_markers.enable and node.depth ~= 1) then
+    indent = string.rep(" ", self.config.indent)
+    local indent_symbol = nil
+    local i = 1
+    while (i ~= node.depth - 1) do
+      indent = indent..self.config.indent_markers.symbols.edge..string.rep(" ", self.config.indent - 1)
+      i = i + 1
+    end
+    if (node:is_last()) then
+      indent_symbol = self.config.indent_markers.symbols.corner
+      indent = indent..self.config.indent_markers.symbols.corner..string.rep(" ", self.config.indent - 1)
     else
-      self:add_highlight(node, self.config.hl.namespace, self.config.hl.directory, 0, len)
+      indent_symbol = self.config.indent_markers.symbols.edge
+      indent = indent..self.config.indent_markers.symbols.edge..string.rep(" ", self.config.indent - 1)
     end
   else
-    self:add_highlight(node, self.config.hl.namespace, self.config.hl.file, 0, len)
+    indent = string.rep(" ", depth2)
   end
+  node.text = indent..node.text
 
+  -- highlight
+  self:add_highlight(node, self.config.indent_markers.hl.ns, self.config.indent_markers.hl.group, 0, #indent)
+  self:add_highlight(node, symbol.hlns, symbol.hlg, #indent, #indent + #head)
+  self:add_highlight(node, name.hlns, name.hlg, (#indent + #head), #node.text)
+
+  -- wrap
+  local width = self.width - self.config.line_width
   if (#node.text > width) then
     node.text = string.sub(node.text, 1, width).."…"
   end
+
+  -- tail
+  local text_len = vim.fn.strchars(node.text)
+  local ext_space = self.width - text_len - 2
+  local ext_off = #node.text + ext_space
+  self:add_highlight(node, ext.hlns, ext.hlg, ext_off, ext_off + #ext.symbol)
+  node.text = node.text..string.rep(" ", ext_space)..ext.symbol
 end
 
 ---@param node       node to add highlight

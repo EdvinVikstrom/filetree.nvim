@@ -8,32 +8,25 @@ local Help = require("filetree.help")
 function Mapping:new(filetree, conf)
   local self = setmetatable({}, { __index = Mapping })
   self.filetree = filetree
-  self.config = (conf or {})
+  self.config = conf
   return self
 end
 
 function Mapping:destroy()
-  if (self.autocmds ~= nil) then
-    for i, map in ipairs(self.autocmds) do
-      vim.api.nvim_del_autocmd(map.id)
-    end
-  end
-
   if (self.keymaps ~= nil) then
     for i, map in ipairs(self.keymaps) do
       vim.keymap.del(map.modes, map.lhs, {buffer = map.opts.buffer})
     end
   end
+
+  if (self.autocmds ~= nil) then
+    for i, cmd in ipairs(self.autocmds) do
+      vim.api.nvim_del_autocmd(cmd.id)
+    end
+  end
 end
 
-function Mapping:setup_config()
-  local conf = self.config
-  if (conf.wrap_cursor == nil) then conf.wrap_cursor = false end
-  if (conf.close_children == nil) then conf.close_children = true end
-  conf.keymaps = (conf.keymaps or Mapping.default_keymaps)
-end
-
-function Mapping:setup_mappings()
+function Mapping:setup_autocmds()
   self.autocmds = {
     { event = "VimEnter", callback = function(info) self:autocmd_vim_enter(info) end },
     { event = "VimLeave", callback = function(info) self:autocmd_vim_leave(info) end },
@@ -44,18 +37,15 @@ function Mapping:setup_mappings()
     { event = "WinClosed", callback = function(info) self:autocmd_win_closed(info) end },
     { event = "User", pattern = "dir_changed", callback = function(info) self:autocmd_user_dir_changed(info) end }
   }
-end
 
-function Mapping:setup_autocmds()
   self.augroup = vim.api.nvim_create_augroup("filetree", { clear = true })
-
-  for i, map in ipairs(self.autocmds) do
+  for i, cmd in ipairs(self.autocmds) do
     local opts = {
       group = self.augroup,
-      pattern = map.pattern,
-      callback = map.callback
+      pattern = cmd.pattern,
+      callback = cmd.callback
     }
-    map.id = vim.api.nvim_create_autocmd(map.event, opts)
+    cmd.id = vim.api.nvim_create_autocmd(cmd.event, opts)
   end
 end
 
@@ -126,10 +116,16 @@ function Mapping:enter() return function(self) self:keymap_enter() end end
 function Mapping:mark(reverse) return function(self) self:keymap_mark(reverse) end end
 function Mapping:make_file() return function(self) self:keymap_make_file() end end
 function Mapping:make_directory() return function(self) self:keymap_make_directory() end end
-function Mapping:rename() return function(self) self:keymap_rename() end end
+function Mapping:rename(what) return function(self) self:keymap_rename(what) end end
 function Mapping:copy() return function(self) self:keymap_copy() end end
 function Mapping:move() return function(self) self:keymap_move() end end
 function Mapping:remove() return function(self) self:keymap_remove() end end
+function Mapping:yank() return function(self) self:keymap_yank() end end
+function Mapping:paste() return function(self) self:keymap_paste() end end
+function Mapping:pack(remove_files) return function(self) self:keymap_pack(remove_files) end end
+function Mapping:compress(remove_file) return function(self) self:keymap_compress(remove_file) end end
+function Mapping:info() return function(self) self:keymap_info() end end
+function Mapping:preview() return function(self) self:keymap_preview() end end
 function Mapping:toggle_hidden() return function(self) self:keymap_toggle_hidden() end end
 function Mapping:redraw() return function(self) self:keymap_redraw() end end
 function Mapping:reload() return function(self) self:keymap_reload() end end
@@ -146,9 +142,17 @@ Mapping.default_keymaps = {
   ["N"] = Mapping:make_file(),
   ["K"] = Mapping:make_directory(),
   ["r"] = Mapping:rename(),
+  ["R"] = Mapping:rename("name"),
+  ["e"] = Mapping:rename("ext"),
   ["c"] = Mapping:copy(),
   ["m"] = Mapping:move(),
   ["x"] = Mapping:remove(),
+  ["y"] = Mapping:yank(),
+  ["p"] = Mapping:paste(),
+  ["P"] = Mapping:pack(false),
+  ["C"] = Mapping:compress(false),
+  ["i"] = Mapping:info(),
+  ["v"] = Mapping:preview(),
   ["."] = Mapping:toggle_hidden(),
   [","] = Mapping:redraw(),
   [";"] = Mapping:reload(),
@@ -272,7 +276,7 @@ function Mapping:keymap_make_file()
     self.filetree:make_file(path)
     if (vim.fn.filereadable(path)) then
       local created = dir_node:add_node_by_path(path)
-      if (created:is_hidden()) then
+      if (created:is_dot_file()) then
 	self.filetree.view.config.show_hidden = true
       end
       dir_node:sort()
@@ -294,7 +298,7 @@ function Mapping:keymap_make_directory()
     self.filetree:make_directory(path)
     if (vim.fn.isdirectory(path)) then
       local created = dir_node:add_node_by_path(path)
-      if (created:is_hidden()) then
+      if (created:is_dot_file()) then
 	self.filetree.view.config.show_hidden = true
       end
       dir_node:sort()
@@ -304,7 +308,8 @@ function Mapping:keymap_make_directory()
   end)
 end
 
-function Mapping:keymap_rename()
+---@param what  if "name": rename file name, if "ext": rename file extension
+function Mapping:keymap_rename(what)
   local selected = self.filetree.view:get_selected()
 
   if (selected == nil) then
@@ -314,9 +319,24 @@ function Mapping:keymap_rename()
 
   local dir_node = self:get_node_tree(selected)
 
-  local new_name = Help:get_user_input("New file name", selected.name)
-  new_name = vim.trim(new_name)
+  local new_name = ""
+  local ext = Help:get_file_extension(selected.name)
+  local name = Help:remove_file_extension(selected.name, ext)
+  if (what == "name" and name ~= "") then
+    new_name = Help:get_user_input("New file name (non ext)", name)
+    if (ext ~= "") then
+      new_name = new_name.."."..ext
+    end
+  elseif (what == "ext" and ext ~= "") then
+    new_name = Help:get_user_input("New file extension", ext)
+    if (name ~= "") then
+      new_name = name.."."..new_name
+    end
+  else
+    new_name = Help:get_user_input("New file name", selected.name)
+  end
 
+  new_name = vim.trim(new_name)
   if (new_name == selected.name or new_name == "") then
     return
   end
@@ -332,7 +352,7 @@ function Mapping:keymap_rename()
   if (Help:file_exists(new_path)) then
     selected:delete()
     local created = dir_node:add_node_by_path(new_path)
-    if (created:is_hidden()) then
+    if (created:is_dot_file()) then
       self.filetree.view.config.show_hidden = true
     end
     dir_node:sort()
@@ -354,24 +374,11 @@ function Mapping:keymap_copy()
     return
   end
 
-  for i, node in ipairs(to_copy) do
-    local new_path = Help:make_path(dir_node.path, node.name)
-    local continue = true
-    if (Help:file_exists(new_path)) then
-      continue = Help:get_user_yesno("A file with name '"..node.name.."' already exists. Overwrite file?", false)
-    end
-
-    if (continue) then
-      self.filetree:copy_file(node.path, new_path)
-      if (Help:file_exists(new_path)) then
-	local created = dir_node:add_node_by_path(new_path)
-	dir_node:sort()
-      end
-    end
-  end
-
+  local num = self:copy_nodes(to_copy, dir_node)
   self.filetree.view:clear_marked()
   self.filetree.view:redraw()
+
+  print(num.." files copied.")
 end
 
 function Mapping:keymap_move()
@@ -385,64 +392,164 @@ function Mapping:keymap_move()
     return
   end
 
-  for i, node in ipairs(to_move) do
-    local new_path = Help:make_path(dir_node.path, node.name)
-    local continue = true
-    if (Help:file_exists(new_path)) then
-      continue = Help:get_user_yesno("A file with name '"..node.name.."' already exists. Overwrite file?", false)
-    end
-
-    if (continue) then
-      self.filetree:move_file(node.path, new_path)
-      if (Help:file_exists(new_path)) then
-	node:delete(node)
-	local created = dir_node:add_node_by_path(new_path)
-	dir_node:sort()
-      end
-    end
-  end
-
+  local num = self:move_nodes(to_move, dir_node)
   self.filetree.view:clear_marked()
   self.filetree.view:redraw()
+
+  print(num.." files moved.")
 end
 
 function Mapping:keymap_remove()
-  local selected = self.filetree.view:get_selected()
-  local marked = self.filetree.view:get_marked()
-
-  local to_remove = {}
-
-  if (not(#marked == 0)) then
-    vim.list_extend(to_remove, marked)
-  else
-    table.insert(to_remove, selected)
-  end
+  local to_remove = self:get_selected_nodes()
+  if (to_remove == nil) then return end
 
   local confirm = Help:get_user_yesno("Remove "..#to_remove.." file(s)?", false)
   if (not confirm) then
     return
   end
 
-  for i, node in ipairs(to_remove) do
-    local path = node.path
-    if (node.type == "link") then
-      local rm_link = Help:get_user_yesno(path.." is a symbolic link. Only remove the link?", true)
-      if (not rm_link) then
-	path = node.rpath
-      end
-    end
-    self.filetree:remove_file(path)
-    if (not Help:file_exists(path)) then
-      node:delete()
-    end
+  local num = self:remove_nodes(to_remove)
+  self.filetree.view:clear_marked()
+  self.filetree.view:redraw()
+
+  print(num.." files removed.")
+end
+
+function Mapping:keymap_yank()
+  if (self.yanked == nil) then return end
+
+  if (self.config.yank_file_names == "path") then
+    local file_paths = Help:make_string_from_list(self.yanked, function(node) return node.path end, "\n")
+    vim.fn.setreg("\"", file_paths, "l")
+  elseif (self.config.yank_file_names == "name") then
+    local file_names = Help:make_string_from_list(self.yanked, function(node) return node.name end, "\n")
+    vim.fn.setreg("\"", file_paths, "l")
   end
+
+  print(#self.yanked.." files yanked.")
 
   self.filetree.view:clear_marked()
   self.filetree.view:redraw()
 end
 
+function Mapping:keymap_paste()
+  local selected = self.filetree.view:get_selected()
+  local dir_node = self:get_node_tree(selected)
+  if (dir_node == nil) then return end
+
+  if (self.yanked == nil or #self.yanked == 0) then
+    print("No files yanked.")
+    return
+  end
+
+  local num = self:move_nodes(self.yanked, dir_node)
+  self.filetree.view:redraw()
+  
+  print(num.." files pasted.")
+end
+
+---@param remove_files  if true: removes the files after packed
+function Mapping:keymap_pack(remove_files)
+  local available_formats = Help:list_available_pkg_formats()
+  if (#available_formats == 0) then
+    print("No package format available")
+    return
+  end
+
+  local to_pack = self:get_selected_nodes()
+  if (to_pack == nil) then return end
+
+  local selected = self.filetree.view:get_selected()
+  local dir_node = self:get_node_tree(selected)
+
+  local path = ""
+  if (dir_node ~= nil) then
+    path = dir_node.path.."/pkg"
+  else
+    path = "/"
+  end
+  path = Help:get_user_input("Package path", path)
+
+  if (Help:file_exists(path)) then
+    if (not Help:get_user_yesno(path.." already exists. Overwrite file?", false)) then
+      return
+    end
+  end
+
+  local format = nil
+  local is_valid = false
+  while (format == nil) do
+    local input_format = Help:get_user_input("Package format ('l' list available)")
+    if (input_format == "" or input_format == "q") then
+      goto leave_loop
+    end
+
+    if (input_format == "l") then
+      local formats_str = ""
+      for i, fmt in ipairs(available_formats) do
+	if (i == #available_formats) then
+	  formats_str = formats_str..fmt[1]
+	else
+	  formats_str = formats_str..fmt[1]..", "
+	end
+      end
+      Help:get_user_continue(formats_str)
+    else
+      for i, fmt in ipairs(available_formats) do
+	if (input_format == fmt[1]) then
+	  format = fmt
+	  goto leave_loop
+	end
+      end
+    end
+  end
+
+  :: leave_loop ::
+
+  if (format == nil) then
+    print("No package format selected")
+    return
+  end
+
+  local options = format[2].default_opts
+  options = Help:get_user_input("Options", options)
+
+  options = vim.fn.substitute(options, "<path>", path, "g")
+
+  local files = ""
+  for i, node in ipairs(to_pack) do
+    local file = vim.fn.fnamemodify(Help:make_path_cl_suitable(node.path), ":.")
+    if (i == #to_pack) then
+      files = "\""..files..file.."\""
+    else
+      files = "\""..files..file.."\" "
+    end
+  end
+  options = vim.fn.substitute(options, "<files>", files, "g")
+
+  format[2].pack_fn(options)
+  self.filetree.view:clear_marked()
+  self.filetree.view:redraw()
+end
+
+---@param remove_file  if true: removes the file after compressed
+function Mapping:keymap_compress(remove_file)
+end
+
+function Mapping:keymap_info()
+  local selected = self.filetree.view:get_selected()
+  if (selected == nil) then return end
+  self.filetree:open_file_info_view(selected)
+end
+
+function Mapping:keymap_preview()
+  local selected = self.filetree.view:get_selected()
+  if (selected == nil) then return end
+  self.filetree:open_file_preview(selected.path)
+end
+
 function Mapping:keymap_toggle_hidden()
-  self.filetree.view.config.show_hidden = not self.filetree.view.config.show_hidden
+  self.filetree.view.config.show_dot_files = not self.filetree.view.config.show_dot_files
   self.filetree.view:redraw()
 end
 
@@ -461,6 +568,84 @@ end
 
 
 -- ### Helper functions ### --
+
+function Mapping:copy_nodes(nodes, dir_node)
+  local num = 0
+  for i, node in ipairs(nodes) do
+    local new_path = Help:make_path(dir_node.path, node.name)
+    local continue = true
+    if (Help:file_exists(new_path)) then
+      continue = Help:get_user_yesno("A file with name '"..node.name.."' already exists. Overwrite file?", false)
+    end
+
+    if (continue) then
+      self.filetree:copy_file(node.path, new_path)
+      if (Help:file_exists(new_path)) then
+	local created = dir_node:add_node_by_path(new_path)
+	num = num + 1
+	dir_node:sort()
+      end
+    end
+  end
+  return num
+end
+
+function Mapping:move_nodes(nodes, dir_node)
+  local num = 0
+  for i, node in ipairs(nodes) do
+    local new_path = Help:make_path(dir_node.path, node.name)
+    local continue = true
+    if (Help:file_exists(new_path)) then
+      continue = Help:get_user_yesno("A file with name '"..node.name.."' already exists. Overwrite file?", false)
+    end
+
+    if (continue) then
+      self.filetree:move_file(node.path, new_path)
+      if (Help:file_exists(new_path)) then
+	node:delete(node)
+	local created = dir_node:add_node_by_path(new_path)
+	num = num + 1
+	dir_node:sort()
+      end
+    end
+  end
+  return num
+end
+
+function Mapping:remove_nodes(nodes)
+  local num = 0
+  for i, node in ipairs(nodes) do
+    local path = node.path
+    if (node.type == "link") then
+      local rm_link = Help:get_user_yesno(path.." is a symbolic link. Only remove the link?", true)
+      if (not rm_link) then
+	path = node.rpath
+      end
+    end
+    self.filetree:remove_file(path)
+    if (not Help:file_exists(path)) then
+      node:delete()
+      num = num + 1
+    end
+  end
+  return num
+end
+
+function Mapping:get_selected_nodes()
+  local selected = self.filetree.view:get_selected()
+  local marked = self.filetree.view:get_marked()
+
+  local nodes = {}
+
+  if (#marked ~= 0) then
+    vim.list_extend(nodes, marked)
+  elseif (selected ~= nil) then
+    table.insert(nodes, selected)
+  else
+    return nil
+  end
+  return nodes
+end
 
 function Mapping:get_node_tree(node)
   if (node == nil) then

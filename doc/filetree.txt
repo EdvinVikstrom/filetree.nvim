@@ -12,6 +12,7 @@ View                                                             |filetree-view|
 Mapping                                                       |filetree-mapping|
 Node                                                             |filetree-node|
 Extensions                                                 |filetree-extensions|
+Integrations                                             |filetree-integrations|
 
 ==============================================================================
 SETUP                                                           *filetree-setup*
@@ -21,19 +22,47 @@ Example config: >
   local FileTree = require("filetree")
   local Mapping = FileTree.Mapping
   FileTree:setup({
+  
+    directory = vim.fn.getcwd(),
+  
+    highlight = {
+      dir = {ctermfg = "blue"},
+      dir_expanded = {ctermfg = "blue"},
+      file = {ctermfg = "white"}
+    },
+  
     view = {
       position = "right",
       width = 40,
-      show_hidden = false,
-      symbols = {
-        tree_expanded = '',
-        tree_closed = ''
-      }
+      height = 40,
+      indent = 2,
+      line_width = 6,
+      show_dot_files = false,
+  
+      indent_markers = {
+        enable = true,
+        symbols = {
+  	edge = "│",
+  	corner = "└"
+        }
+      },
+  
+      file_symbols = {
+        dir = {symbol = "", hlg = "filetree_dir"},
+        dir_expanded = {symbol = "", hlg = "filetree_dir_expanded"},
+        file = ""
+      },
+  
+      file_names = {
+        dir = {prefix = "/"},
+        dir_expanded = {prefix = "/"}
+      },
     },
   
     mapping = {
       wrap_cursor = true,
       close_children = true,
+      yank_file_names = "path",
       keymaps = {
         ["j"] = Mapping:cursor_down(),
         ["k"] = Mapping:cursor_up(),
@@ -45,9 +74,17 @@ Example config: >
         ["N"] = Mapping:make_file(),
         ["K"] = Mapping:make_directory(),
         ["r"] = Mapping:rename(),
+        ["R"] = Mapping:rename("name"),
+        ["e"] = Mapping:rename("ext"),
         ["c"] = Mapping:copy(),
         ["m"] = Mapping:move(),
         ["x"] = Mapping:remove(),
+        ["y"] = Mapping:yank(),
+        ["p"] = Mapping:paste(),
+        ["P"] = Mapping:pack(false),
+        ["C"] = Mapping:compress(false),
+        ["i"] = Mapping:info(),
+        ["v"] = Mapping:preview(),
         ["."] = Mapping:toggle_hidden(),
         [","] = Mapping:redraw(),
         [";"] = Mapping:reload(),
@@ -55,8 +92,55 @@ Example config: >
       }
     },
   
-    extensions = {"icons"}
+    file_preview = {
+      quit_on_esc = true,
+      type = "float",
+      relative = "editor",
+      absolute = false,
+      width = 0.9,
+      height = 0.7,
+      row = 0.5,
+      col = 0.5,
+      border = "single",
+      number = true,
+      relativenumber = true
+    },
+  
+    filters = {
+      exclude = {
+        dot_files = false,
+        pattern = ""
+      }
+    },
+  
+    actions = {
+      sort_nodes = {
+        method = "name",
+        directories = "top",
+        reverse = false
+      },
+  
+      root_changed = {
+        change_cwd = false
+      },
+  
+      open_file = {
+        quit_tree = false,
+        window_picker = {
+  	enable = true,
+  	ids = "aoeuhtns",
+  	exclude = {
+  	  buftypes = {"nofile", "help"},
+  	  bufnames = {}
+  	}
+        }
+      }
+    }
+  
   })
+  _G.filetree:enable_extension("icons", {position = "first"})
+  _G.filetree:enable_integration("statline")
+  vim.cmd("FTreeOpen")
 
 ==============================================================================
 COMMANDS                                                     *filetree-commands*
@@ -70,156 +154,788 @@ COMMANDS                                                     *filetree-commands*
 ==============================================================================
 CONFIG                                                         *filetree-config*
 
-namespace~
-  `string`
-  I don't know what this is for.
-
-win_ids~
-  `table`
-  Ids to use when picking a window. |filetree-open_file|
-  (default: {"a", "o", "e", "u", "h", "t", "n", "s"})
-
-change_dir~
-  `boolean`
-  Changes current working directory when entering a tree.
-  (default: false)
-
 directory~
   `string`
   Root directory of the file tree.
   (default: current working directory)
 
-file_callback~
-  `function`
-  Callback when trying to open selected file.
-  Can have 1 parameters:
-    file `string`
-
-extensions~
+highlight~
   `table`
-  List of extensions to enable.
-  Available extensions are:
-    `icons`, `statline`
+  Table of highlights to define.
+  Each entry must be a table with a key and have these values:
+    - `cterm`(optional)    See: |highlight-args|
+    - `ctermfg`(optional)  See: |highlight-args|
+    - `ctermbg`(optional)  See: |highlight-args|
+  where key is the highlight name.
+  (default: {})
 
-  See: |filetree-extensions|
+highlight.dir~
+  `table`
+  Highlight for directory.
+  (default: `{ctermfg = 223}`)
 
-view.cursor_offset~
-  `number`
-  Offset when selecting a node.
-  (default: 0)
+highlight.dir_expanded~
+  `table`
+  Highlight for expanded directory.
+  (default: `{ctermfg = 208}`)
+
+highlight.file~
+  `table`
+  Highlight for file.
+  (default: `{ctermfg = 246}`)
+
+highlight.edge~
+  `table`
+  Highlight for indent marker edge.
+  (default: `{ctermfg = "white"}`)
+
+highlight.corner~
+  `table`
+  Highlight for indent marker corner.
+  (default: `{ctermfg = "white"}`)
+
+highlight.fi_key_path~
+  `table`
+  Highlight for the key `path` in |filetree-file-info-view|.
+  (default: `{ctermfg = "white"}`)
+
+highlight.fi_key_name~
+  `table`
+  Highlight for the key `name` in |filetree-file-info-view|.
+  (default: `highlight.fi_key_path`)
+
+highlight.fi_key_type~
+  `table`
+  Highlight for the key `type` in |filetree-file-info-view|.
+  (default: `highlight.fi_key_path`)
+
+highlight.fi_key_size~
+  `table`
+  Highlight for the key `size` in |filetree-file-info-view|.
+  (default: `highlight.fi_key_path`)
+
+highlight.fi_key_perm~
+  `table`
+  Highlight for the key `perm` in |filetree-file-info-view|.
+  (default: `highlight.fi_key_path`)
+
+highlight.fi_key_created~
+  `table`
+  Highlight for the key `created` in |filetree-file-info-view|.
+  (default: `highlight.fi_key_path`)
+
+highlight.fi_key_modified~
+  `table`
+  Highlight for the key `modified` in |filetree-file-info-view|.
+  (default: `highlight.fi_key_path`)
+
+highlight.fi_key_readable~
+  `table`
+  Highlight for the key `readable` in |filetree-file-info-view|.
+  (default: `highlight.fi_key_path`)
+
+highlight.fi_key_writable~
+  `table`
+  Highlight for the key `writable` in |filetree-file-info-view|.
+  (default: `highlight.fi_key_path`)
+
+highlight.fi_key_link~
+  `table`
+  Highlight for the key `link` in |filetree-file-info-view|.
+  (default: `highlight.fi_key_path`)
+
+highlight.fi_path~
+  `table`
+  Highlight for `path` in |filetree-file-info-view|.
+  (default: `{ctermfg = "white"}`)
+
+highlight.fi_name~
+  `table`
+  Highlight for `name` in |filetree-file-info-view|.
+  (default: `highlight.fi_path`)
+
+highlight.fi_type~
+  `table`
+  Highlight for `type` in |filetree-file-info-view|.
+  (default: `highlight.fi_path`)
+
+highlight.fi_size~
+  `table`
+  Highlight for `size` in |filetree-file-info-view|.
+  (default: `highlight.fi_path`)
+
+highlight.fi_perm~
+  `table`
+  Highlight for `perm` in |filetree-file-info-view|.
+  (default: `highlight.fi_path`)
+
+highlight.fi_created~
+  `table`
+  Highlight for `created` in |filetree-file-info-view|.
+  (default: `highlight.fi_path`)
+
+highlight.fi_modified~
+  `table`
+  Highlight for `modified` in |filetree-file-info-view|.
+  (default: `highlight.fi_path`)
+
+highlight.fi_readable~
+  `table`
+  Highlight for `readable` in |filetree-file-info-view|.
+  (default: `highlight.fi_path`)
+
+highlight.fi_writable~
+  `table`
+  Highlight for `writable` in |filetree-file-info-view|.
+  (default: `highlight.fi_path`)
+
+highlight.fi_link~
+  `table`
+  Highlight for `link` in |filetree-file-info-view|.
+  (default: `highlight.fi_path`)
+
+view~
+  `table`
+  Table with view options.
+  (default: {})
 
 view.position~
-  `string` {"west", "east", "south", "north"}
-  Position of window.
-  (default: "west")
+  `string`
+  Position of the tree window.
+  Valid values are: "left", "right", "bottom", "top"
+  (default: "left")
 
 view.width~
   `number`
-  Window width.
-  (default: 40)
+  Width of the tree window.
+  (default: 30)
+
+view.height~
+  `number`
+  Height of the tree window.
+  (default: 30)
+
+view.indent~
+  `number`
+  Number of spaces to indent.
+  (default: 2)
 
 view.line_width~
   `number`
-  Relative width of node line.
+  Maximum width of a line.
+  Interpreted as (width - line_width), where width is the tree window width.
   (default: 6)
 
-view.show_hidden~
+view.show_dot_files~
   `boolean`
-  Show files starting with a `.` (dot).
+  Show dot files (aka hidden files) in file tree.
   (default: false)
 
-view.symbols~
+view.render_callback~
+  `function`|`nil`
+  Function to call when a node needs to render.
+  It takes one parameter, |filetree-node|.
+  (default: nil)
+
+view.indent_markers~
+ `table`
+ Options for indenting markers in file tree.
+ (default: {})
+
+view.indent_markers.enable~
+  `boolean`
+  Enable indent markers.
+  (default: false)
+
+view.indent_markers.hl~
+  `table`|`string`
+  Highlight to use when rendering indent.
+  If table then these values are valid:
+    - `ns`     `number` Highlight namespace to use.
+    - `group`  `string` Highlight group to use.
+
+view.indent_markers.symbols~
   `table`
-  Table of symbols to use when rendering file tree.
-  (default: {} see below)
+  Table of symbols to use when indenting markers.
+  Each entry must be a string with the symbol.
+  (default: {})
 
-view.symbols.file~
+view.indent_markers.symbols.edge~
   `string`
-  Symbol for a file.
-  (default: "-")
+  Edge of a marker.
+  (default: "│")
 
-view.symbols.tree_expanded~
+view.indent_markers.symbols.corner~
   `string`
-  Symbol when a node is expanded.
-  (default: "v")
+  Corner of a marker.
+  (default: "└")
 
-view.symbols.tree_closed~
-  `string`
-  Symbol when a node is closed.
-  (default: ">")
-
-view.hl~
+view.file_symbols~
   `table`
-  Table of highlight groups to use when rendering file tree.
-  (default: {} see below)
+  Table of symbols for diffrent file types.
+  Each entry must be a table or a string:
+  If entry is a table then these values are valid.
+    - `symbol`            `string` Symbol for file.
+    - `hlns`(optional)    `number` Highlight namespace to use.
+    - `hlg`(optional)     `string` Highlight group to use.
+  If entry is a string then the file symbol is the string.
+  (default: {})
 
-view.hl.namespace~
-  `number`
-  Highlight namespace.
-  (default: 0)
+view.file_symbols.dir~
+  `table`|`string`
+  Symbol for directory.
+  (default: `{symbol = "", hlg = "filetree_dir"}`)
 
-view.hl.expanded_directory~
-  `string`
-  Highlight group for expanded directory.
-  (default: "filetree_expanded_dir")
+view.file_symbols.dir_expanded~
+  `table`|`string`
+  Symbol for expanded directory.
+  (default: `{symbol = "", hlg = "filetree_dir_expanded"}`)
 
-view.hl.directory~
-  `string`
-  Highlight group for directories.
-  (default: "filetree_dir")
+view.file_symbols.link_dir~
+  `table`|`string`
+  Symbol for directory symlink.
+  (default: `view.file_symbols.dir`)
 
-view.hl.file~
-  `string`
-  Highlight group for files.
-  (default: "filetree_file")
+view.file_symbols.link_dir_expanded~
+  `table`|`string`
+  Symbol for expanded directory symlink.
+  (default: `view.file_symbols.dir_expanded`)
 
-view.hl.render_callback~
-  `function`
-  Callback when a node needs to render.
-  Can have 2 parameters:
-    view |filetree-view|
-    node |filetree-node|
+view.file_symbols.file~
+  `table`|`string`
+  Symbol for file.
+  (default: `{symbol = "", hlg = "filetree_file"}`)
 
-  Example: >
+view.file_symbols.link~
+  `table`|`string`
+  Symbol for symlink file.
+  (default: `view.file_symbols.file`)
 
-    function(view, node)
-      view:render_callback(node)
+view.file_symbols.block~
+  `table`|`string`
+  Symbol for block device file.
+  (default: `view.file_symbols.file`)
 
-      if (node.rtype == "directory") then
-	node.text = node.text.." DIR"
-      else
-	node.text = node.text.." FILE"
-      end
-    end
+view.file_symbols.char~
+  `table`|`string`
+  Symbol for char device file.
+  (default: `view.file_symbols.file`)
+
+view.file_symbols.socket~
+  `table`|`string`
+  Symbol for socket file.
+  (default: `view.file_symbols.file`)
+
+view.file_symbols.fifo~
+  `table`|`string`
+  Symbol for fifo file.
+  (default: `view.file_symbols.file`)
+
+view.file_names~
+  `table`
+  Table of information on how a file name is displayed.
+  Each entry must be a table with these values:
+    - `prefix`(optional)  `string` Text to place before file name.
+    - `suffix`(optional)  `string` Text to place after file name.
+    - `hlns`(optional)    `number` Highlight namespace to use.
+    - `hlg`(optional)     `string` Highlight group to use.
+  (default: {})
+
+view.file_names.dir~
+  `table`
+  Information on how a directory name is displayed.
+  (default: `{suffix = "/", hlg = "filetree_dir"}`)
+  
+view.file_names.dir_expanded~
+  `table`
+  Information on how a expanded directory name is displayed.
+  (default: `{suffix = "/", hlg = "filetree_dir_expanded"}`)
+ 
+view.file_names.link_dir~
+  `table`
+  Information on how a directory symlink name is displayed.
+  (default: `viem.file_names.dir`)
+  
+view.file_names.link_dir_expanded~
+  `table`
+  Information on how a expanded directory symlink name is displayed.
+  (default: `view.file_names.dir_expanded`)
+  
+view.file_names.file~
+  `table`
+  Information on how a file name is displayed.
+  (default: `{suffix = "", hlg = "filetree_file"}`)
+
+view.file_names.link~
+  `table`
+  Information on how a symlink file name is displayed.
+  (default: `{suffix = "@", hlg = "filetree_file"}`)
+
+view.file_names.block~
+  `table`
+  Information on how a block device file name is displayed.
+  (default: `{suffix = "#", hlg = "filetree_file"}`)
+
+view.file_names.char~
+  `table`
+  Information on how a char device file name is displayed.
+  (default: `{suffix = "%", hlg = "filetree_file"}`)
+
+view.file_names.socket~
+  `table`
+  Information on how a socket file name is displayed.
+  (default: `{suffix = "=", hlg = "filetree_file"}`)
+
+view.file_names.fifo~
+  `table`
+  Information on how a fifo file name is displayed.
+  (default: `{suffix = "|", hlg = "filetree_file"}`)
+
+view.file_exts~
+  `table`
+  Table of symbols to display at the end of a line.
+  Each entry must be a table with these values:
+    - `symbol`(optional)  `string` Symbol to display.
+    - `hlns`(optional)    `number` Highlight namespace to use.
+    - `hlg`(optional)     `string` Highlight group to use.
+  (default: {})
+
+view.file_exts.dir~
+  `table`|`nil`
+  Symbol for a directory to display at end of line.
+  (default: nil)
+
+view.file_exts.dir_expanded~
+  `table`|`nil`
+  Symbol for a expanded directory to display at end of line.
+  (default: nil)
+
+view.file_exts.link_dir~
+  `table`|`nil`
+  Symbol for a directory symlink to display at end of line.
+  (default: `view.file_exts.dir`)
+
+view.file_exts.link_dir_expanded~
+  `table`|`nil`
+  Symbol for a expanded directory symlink to display at end of line.
+  (default: `view.file_exts.dir_expanded`)
+
+view.file_exts.file~
+  `table`|`nil`
+  Symbol for a file to display at the end of line.
+  (default: nil)
+
+view.file_exts.link~
+  `table`|`nil`
+  Symbol for a symlink file to display at the end of line.
+  (default: `view.file_exts.file`)
+
+view.file_exts.block~
+  `table`|`nil`
+  Symbol for a block device file to display at the end of line.
+  (default: `view.file_exts.file`)
+
+view.file_exts.char~
+  `table`|`nil`
+  Symbol for a char device file to display at the end of line.
+  (default: `view.file_exts.file`)
+
+view.file_exts.socket~
+  `table`|`nil`
+  Symbol for a socket file to display at the end of line.
+  (default: `view.file_exts.file`)
+
+view.file_exts.fifo~
+  `table`|`nil`
+  Symbol for a fifo file to display at the end of line.
+  (default: `view.file_exts.file`)
+
+mapping~
+  `table`
+  Table of options used for key mappings.
+  (default: {})
 
 mapping.wrap_cursor~
   `boolean`
-  Sets the cursor at the top if reached bottom and sets
-  cursor at bottom if reached top.
+  Wraps the cursor.
   (default: false)
 
 mapping.close_children~
   `boolean`
-  Closes all children when closing a tree.
+  Close sub directories when closing a directory.
   (default: true)
+
+mapping.yank_file_names~
+  `string`
+  Save yanked files file names to yank reigster.
+  Valid values are: "none", "path", "name"
+    - "none"  Do not put file name in register.
+    - "path"  Save the file path.
+    - "name"  Save the file name.
+  (default: "path")
 
 mapping.keymaps~
   `table`
-  Table of key mappings. See |filetree-mapping|
-  
-  Example: >
+  Table of key mappings.
+  See |filetree-mappings|.
 
-    {
-      ["<C-Space>"] = Mapping:toggle_hidden()
-    }
+file_info_view~
+  `table`
+  Table of options for the file info view.
+  (default: {})
+
+file_info_view.content~
+  `table`
+  List of things to display in the info view.
+  Each entry must be a table with these optinal entries:
+    - `callback`  `function`(optional) functions to call when
+                displaying a file attribute.
+		The arguments passed to the callback are:
+		  - `lines`  `table` Lines to render in window.
+		  - `hls`    `table` Highlights to use.
+		           Must have 5 values which are:
+			     - `hl_ns`      Highlight namespace.
+			     - `hl_group`   Highlight group.
+			     - `line`       Line to start the highlight.
+			     - `col_start`  Column to start the highlight.
+			     - `col_end`    Column to end the highlight.
+		  - `node`   `table` The node to display.
+    - `key`       `string`(optional if `callback` is provided)
+                the name of the value to display.
+                Valid values are:
+                  - "path"      Display the file path.
+	          - "name"      Display the file name.
+	          - "type"      Display the file type.
+	          - "size"      Display the file size.
+	          - "perm"      Display the file permissions.
+	          - "created"   Display the file created time.
+	          - "modified"  Display the file modified time.
+		  - "readable"  Display if file is readable.
+		  - "writable"  Display if file is writable.
+		  - "link"      Display all linked files if type is symlink.
+    - `prefix`    `table`|`string`(optional) text to display before the value.
+    - `fmt`       `string`(optional) the format of the value.
+                Uses the Lua `string.format` function that get passed with
+	        these arguments:
+	          - value to display.
+		  - (optional) suffix for value (like "MiB" for the `size` key).
+    - `hlns`      `number`(optional) highlight namespace to use
+                when highlighting value.
+    - `hlg`       `string`(optional) highlight group to use
+                when highlighting value.
+    - `resolved`  `boolean`(optional) use the resolved file path.
+  (default: `{...}`)
+
+file_preview~
+  `table`
+  Table of options to use for file preview.
+  (default: {})
+
+file_preview.quit_on_esc~
+  `boolean`
+  Quit the preview when pressing <Escape>.
+  (default: true)
+
+file_preview.type~
+  `string`
+  Type of window.
+  Valid values are:
+    - "float"   For a floating window.
+              See: |api-floatwin|.
+    - "normal"  For a non-floating window.
+  (default: "float")
+
+file_preview.relative~
+  `string`
+  See: |nvim_open_win()|.
+  (default: "editor")
+	
+file_preview.absolute~
+  `boolean`
+  Place window at absolute values if true. Otherwise
+  place window at percent of values. (TODO)
+  (default: false)
+
+file_preview.width~
+  `number`
+  Width of preview window.
+  (default: 0.9)
+
+file_preview.height~
+  `number`
+  Height of preview window.
+  (default: 0.7)
+
+file_preview.row~
+  `number`
+  Row position of preview window.
+
+file_preview.col~
+  `number`
+  Column position of preview window.
+
+file_preview.border~
+  `string`
+  See: |nvim_open_win()|.
+  (default: "single")
+
+file_preview.number~
+  `boolean`
+  Enable 'number' option for preview window.
+  (default: true)
+
+file_preview.relativenumber~
+  `boolean`
+  Enable 'relativenumber' option for preview window.
+  (default: true)
+
+filters~
+  `table`
+  Table of options for filtering files from directories.
+  (default: {})
+
+filters.callback~
+  `function`|`nil`
+  Function to call when filtering files.
+  Callback has 1 argument:
+    - `files`  `table` Files to filter.
+  (default: nil)
+
+filters.exclude~
+  `table`
+  Options for excluding files.
+  (default: {})
+
+filters.exclude.dot_files~
+  `boolean`
+  Exclude dot files (aka hidden files) from directory.
+  (default: false)
+
+filters.pattern~
+  `string`
+  Exclude files that matches the pattern (|regular-expression|).
+  (default: "")
+
+actions~
+  `table`
+  Table of options for diffrent actions.
+  (default: {})
+
+actions.sort_nodes~
+  `table`
+  Options to use when sorting nodes.
+  (default: {})
+
+actions.sort_nodes.callback~
+  `function`|`nil`
+  Callback for sorting nodes.
+  The callback has 1 parameter:
+    - `nodes`  Nodes to sort.
+  (default: nil)
+
+actions.sort_nodes.method~
+  `string`
+  Method to use when sorting nodes.
+  Valid values are:
+    - "name"       Sort by file name.
+    - "nameS"      Sort by file name (case sensitive).
+    - "type"       Sort by file type.
+    - "rtype"      Sort by resolved file type.
+    - "size"       Sort by file size.
+    - "modified"   Sort by file last modified.
+  (default: "name")
+
+actions.sort_nodes.directories~
+  `string`
+  How to sort directories.
+  Valid values are:
+    - "none"    Do not sort directories.
+    - "top"     Place directories at top of the tree.
+    - "bottom"  Place directories at bottom of the tree.
+  (default: "top")
+
+actions.sort_nodes.reverse~
+  `boolean`
+  Reverse node order.
+  (default: false)
+
+actions.root_changed~
+  `table`
+  Options to use when changing root.
+  (default: {})
+
+actions.root_changed.callback~
+  `function`|`nil`
+  Function to call when root was changed.
+  Callback has 1 argument:
+    - `tree`  The new root tree.
+  (default: nil)
+
+actions.root_changed.change_cwd~
+  `boolean`
+  Changes the current working directory when changing root tree.
+  (default: false)
+
+actions.open_file~
+  `table`
+  Options to use when opening a file.
+  (default: {})
+
+actions.open_file.callback~
+  `function`|`nil`
+  Function to call when opening a file.
+  Callback takes 1 argument:
+    - `file`  `string` File to open.
+  (default: nil)
+
+actions.open_file.quit_tree~
+  `boolean`
+  Quit file tree when opening a file.
+  (default: false)
+
+actions.open_file.window_picker~
+  `table`
+  Options to use when choosing a window.
+  (default: {})
+
+actions.open_file.window_picker.enable~
+  `boolean`
+  Enable window picker.
+  (default: true)
+
+actions.open_file.window_picker.ids~
+  `string`
+  String of chars to use for diffrent windows.
+  (default: "aoeuhtns")
+
+actions.open_file.window_picker.exclude~
+  `table`
+  Options to use when excluding buffers.
+  (default: {})
+
+actions.open_file.window_picker.exclude.self~
+  `boolean`
+  Exlude file tree buffer.
+  (default: true)
+
+actions.open_file.window_picker.exclude.buftypes~
+  `table`
+  List of buffer types to exclude.
+  See: |'buftype'|.
+  (default: `{"nofile", "help"}`)
+
+actions.open_file.window_picker.exclude.bufnames~
+  `table`
+  List of buffer names to exclude.
+  (default: {})
+
+actions.open_file.window_picker.suitable_callback~
+  `function`|`nil`
+  Function to check if a buffer should be listed when picking window.
+  Add buffer to list if callback returns true.
+  Callback takes 1 argument:
+    - `buf`  `number` Buffer to test.
+  (default: nil)
+
+actions.read_file~
+  `table`
+  Options to use when reading a file.
+  (default: {})
+
+actions.read_file.callback~
+  `function`|`nil`
+  Function to call when reading a file.
+  If callback returns non-nil, then the result is used as the file content.
+  Callback takes 1 argument:
+    - `file`  File path to read.
+  (default: nil)
+
+actions.read_directory~
+  `table`
+  Options to use when reading a directory.
+  (default: {})
+
+actions.read_directory.callback~
+  `function`|`nil`
+  Function to call when reading a directory.
+  If callback returns non-nil, then the result is used as the
+  directory content. The result must be a table with tables
+  with these values:
+    - `name`  `string` File name.
+    - `type`  `string` File type.
+  Callback takes 1 argument:
+    - `file`  File path to read.
+  (default: nil)
+
+actions.make_file~
+  `table`
+  Options to use when creating a file.
+  (default: {})
+
+actions.make_file.callback~
+  `function`|`nil`
+  Function to call to create a file.
+  Callback takes 1 argument:
+    - `file`  `string` File to create.
+  (default: nil)
+
+actions.make_directory~
+  `table`
+  Options to use when creating a directory.
+  (default: {})
+
+actions.make_directory.callback~
+  `function`|`nil`
+  Function to call to create a directory.
+  Callback takes 1 argument:
+    - `path`  `string` Directory path to create.
+  (default: nil)
+
+actions.copy_file~
+  `table`
+  Options to use when copying a file.
+  (default: {})
+
+actions.copy_file.callback~
+  `function`|`nil`
+  Function to call to copy a file.
+  Callback takes 2 arguments:
+    - `file`  `string` File to copy.
+    - `dest`  `string` Destination for the new file.
+  (default: nil)
+
+actions.move_file~
+  `table`
+  Options to use when moving a file.
+  (default: {})
+
+actions.move_file.callback~
+  `function`|`nil`
+  Function to call to move a file.
+  Callback takes 2 arguments:
+    - `file`  `string` File to move.
+    - `dest`  `string` New file path.
+  (default: nil)
+
+actions.remove_file~
+  `table`
+  Options to use when removing a file.
+  (default: {})
+
+actions.remove_file.callback~
+  `function`|`nil`
+  Function to call to remove a file.
+  Callback takes 1 argument:
+    - `file`  `string` File to remove.
+  (default: nil)
 
 ==============================================================================
 VIEW                                                             *filetree-view*
 
 Class that handles all the rendering.
 
-View:render_callback()                         *filetree-view-render_callback()*
-  Default node rendering function.
+View:render_line()                             *filetree-view-render_line()*
+  Render line to use in buffer.
 
   Parameters:~
     {node}  |filetree-node| Node to render.
@@ -229,10 +945,10 @@ View:add_highlight()                             *filetree-view-add_highlight()*
 
   Parameters:~
     {node}       |filetree-node| Node to highlight.
-    {namespace}  number Highlight namespace.
-    {group}      string Highlight group.
-    {first}      number First column to higlight.
-    {last}       number Last column to highlight.
+    {namespace}  `number` Highlight namespace.
+    {group}      `string` Highlight group.
+    {first}      `number` First column to higlight.
+    {last}       `number` Last column to highlight.
 
 View:get_cursor()                                   *filetree-view-get_cursor()*
 
@@ -296,11 +1012,10 @@ Mapping:enter()                                       *filetree-mapping-enter()*
     Changes the root directory if directory, otherwise opens file in a window.
 
 Mapping:mark()                                         *filetree-mapping-mark()*
-    @param reverse  `boolean` moves cursor in reverse
     Adds selected node to marked nodes.
 
     Parameters:~
-      {reverse}  boolean Moves cursor up if true.
+      {reverse}  `boolean` Moves cursor up if true.
 
 Mapping:make_file()                               *filetree-mapping-make_file()*
     Asks user for a file name and then creates the file.
@@ -308,8 +1023,12 @@ Mapping:make_file()                               *filetree-mapping-make_file()*
 Mapping:make_directory()                     *filetree-mapping-make_directory()*
     Asks user for a directory name and then creates the directory.
 
-Mapping:rename()                                     *filetree-mapping-rename()*
+Mapping:rename(what)                                 *filetree-mapping-rename()*
     Asks the user for a new file name and renames selected file.
+
+    Parameters:~
+      {what}  `string` What part of the file name to rename.
+              Valid values are: "name", "ext", nil for full name.
 
 Mapping:copy()                                         *filetree-mapping-copy()*
     Copy marked files to current parent node.
@@ -319,6 +1038,18 @@ Mapping:move()                                         *filetree-mapping-move()*
 
 Mapping:remove()                                     *filetree-mapping-rename()*
     Removes selected/marked files.
+
+Mapping:yank()                                         *filetree-mapping-yank()*
+    Yank selected/marked files.
+
+Mapping:paste()                                       *filetree-mapping-paste()*
+    Paste yanked files.
+
+Mapping:info()                                         *filetree-mapping-info()*
+    View file info.
+
+Mapping:preview()                                   *filetree-mapping-preview()*
+    View file in a preview window info.
 
 Mapping:toggle_hidden()                       *filetree-mapping-toggle_hidden()*
     Toggle hiddens files to render or not.
@@ -338,23 +1069,26 @@ NODE                                                             *filetree-node*
 Node is a class with variables:
   {name, path, parent, depth, type}
 
+                                                           *filetree-node-new()*
 Node:new()
   Creates a new node.
   
   Parameters:~
-    {name}    string File name.
-    {path}    string File path.
+    {name}    `string` File name.
+    {path}    `string` File path.
     {parent}  |filetree-node| Parent of this node.
-    {depth}   number Directory level.
-    {type}    string File type.
+    {depth}   `number` Directory level.
+    {type}    `string` File type.
 
   Returns:~
     Node metatable.
 
+                                                        *filetree-node-delete()*
 Node:delete()
   Deletes node from parent node.
 
-Node:is_hidden()
+                                                   *filetree-node-is_dot_file()*
+Node:is_dot_file()
 
   Returns:~
     True if name starts with a `.` (dot).
@@ -362,11 +1096,24 @@ Node:is_hidden()
 ==============================================================================
 EXTENSIONS                                                 *filetree-extensions*
 
-icons~
-  Fancy icons for file types.
+Call `_G.filetree:enable_extension(name, conf)` to enable a extension,
+where `name` is the name and `conf` is the config.
 
-statline~
-  Shows info about the tree in the `statline` plugin.
-  https://gitlab.com/EdvinVikstrom/statline.nvim
+Available extensions are:
+
+  icons~
+    Fancy icons for file types.
+
+==============================================================================
+INTEGRATIONS                                             *filetree-integrations*
+
+Call `_G.filetree:enable_integration(name, conf)` to enable a integration,
+where `name` is the name and `conf` is the config.
+
+Available integrations are:
+
+  statline~
+    Shows info about the tree in the `statline` plugin.
+    https://gitlab.com/EdvinVikstrom/statline.nvim
 
  vim:tw=78:ts=8:ft=help:norl:

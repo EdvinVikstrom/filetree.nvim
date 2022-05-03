@@ -9,8 +9,9 @@ local Help = require("filetree.help")
 ---@param depth   directory level
 ---@param type    file type
 ---@returns Tree metatable
-function Tree:new(name, path, parent, depth, type)
+function Tree:new(conf, name, path, parent, depth, type)
   local self = setmetatable(Node:new(name, path, parent, depth, type), { __index = Tree })
+  self.config = conf
   self.children = {}
   self.loaded = false
   self.expanded = false
@@ -48,17 +49,15 @@ function Tree:close_recursive()
 end
 
 function Tree:reload()
-  self.children = Help:read_directory(self.rpath)
+  self.children = self.config.read_directory_fn(self.rpath)
 
   if (self.children ~= nil) then
     for i, file in ipairs(self.children) do
       local path = Help:make_path(self.path, file.name)
-      if (not(file.name == ".") and not(file.name == "..")) then
-	if (file.type == "directory" or (file.type == "link" and Help:get_file_type(vim.fn.resolve(path)) == "directory")) then
-	  self.children[i] = Tree:new(file.name, path, self, self.depth + 1, file.type)
-	else
-	  self.children[i] = Node:new(file.name, path, self, self.depth + 1, file.type)
-	end
+      if (file.type == "directory" or (file.type == "link" and Help:get_file_type(vim.fn.resolve(path)) == "directory")) then
+	self.children[i] = Tree:new(self.config, file.name, path, self, self.depth + 1, file.type)
+      else
+	self.children[i] = Node:new(file.name, path, self, self.depth + 1, file.type)
       end
     end
 
@@ -74,7 +73,7 @@ function Tree:reload()
 end
 
 function Tree:soft_reload()
-  local files = Help:read_directory(self.rpath)
+  local files = self.config.read_directory_fn(self.rpath)
   local new_files = {}
 
   -- check for new files
@@ -117,15 +116,7 @@ function Tree:soft_reload_recursive()
 end
 
 function Tree:sort()
-  -- TODO: config
-  table.sort(self.children, function(a, b)
-    if (a.rtype == "directory" and not(b.rtype == "directory")) then
-      return true
-    elseif (b.rtype == "directory" and not(a.rtype == "directory")) then
-      return false
-    end
-    return (string.upper(a.name) < string.upper(b.name))
-  end)
+  self.config.sort_nodes_fn(self.children)
   self.changed = true
 end
 
@@ -203,7 +194,7 @@ end
 
 function Tree:create_node(name, path, type)
   if (type == "directory" or (type == "link" and Help:get_file_type(vim.fn.resolve(path)) == "directory")) then
-    return Tree:new(name, path, self, self.depth + 1, type)
+    return Tree:new(self.config, name, path, self, self.depth + 1, type)
   end
   return Node:new(name, path, self, self.depth + 1, type)
 end
