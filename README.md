@@ -134,7 +134,6 @@ FileTree:setup({
 
 })
 _G.filetree:enable_extension("icons", {position = "first"})
-_G.filetree:enable_integration("statline")
 vim.cmd("FTreeOpen")
 ```
 

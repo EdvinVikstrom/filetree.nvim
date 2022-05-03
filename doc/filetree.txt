@@ -139,7 +139,6 @@ Example config: >
   
   })
   _G.filetree:enable_extension("icons", {position = "first"})
-  _G.filetree:enable_integration("statline")
   vim.cmd("FTreeOpen")
 
 ==============================================================================
@@ -154,11 +153,13 @@ COMMANDS                                                     *filetree-commands*
 ==============================================================================
 CONFIG                                                         *filetree-config*
 
+                                                     *filetree-config-directory*
 directory~
   `string`
   Root directory of the file tree.
   (default: current working directory)
 
+                                                     *filetree-config-highlight*
 highlight~
   `table`
   Table of highlights to define.
@@ -169,184 +170,220 @@ highlight~
   where key is the highlight name.
   (default: {})
 
+                                                 *filetree-config-highlight.dir*
 highlight.dir~
   `table`
   Highlight for directory.
   (default: `{ctermfg = 223}`)
 
+                                        *filetree-config-highlight.dir_expanded*
 highlight.dir_expanded~
   `table`
   Highlight for expanded directory.
   (default: `{ctermfg = 208}`)
 
+                                                *filetree-config-highlight.file*
 highlight.file~
   `table`
   Highlight for file.
   (default: `{ctermfg = 246}`)
 
+                                                *filetree-config-highlight.edge*
 highlight.edge~
   `table`
   Highlight for indent marker edge.
   (default: `{ctermfg = "white"}`)
 
+                                              *filetree-config-highlight.corner*
 highlight.corner~
   `table`
   Highlight for indent marker corner.
   (default: `{ctermfg = "white"}`)
 
+                                         *filetree-config-highlight.fi_key_path*
 highlight.fi_key_path~
   `table`
   Highlight for the key `path` in |filetree-file-info-view|.
   (default: `{ctermfg = "white"}`)
 
+                                         *filetree-config-highlight.fi_key_name*
 highlight.fi_key_name~
   `table`
   Highlight for the key `name` in |filetree-file-info-view|.
   (default: `highlight.fi_key_path`)
 
+                                         *filetree-config-highlight.fi_key_type*
 highlight.fi_key_type~
   `table`
   Highlight for the key `type` in |filetree-file-info-view|.
   (default: `highlight.fi_key_path`)
 
+                                         *filetree-config-highlight.fi_key_size*
 highlight.fi_key_size~
   `table`
   Highlight for the key `size` in |filetree-file-info-view|.
   (default: `highlight.fi_key_path`)
 
+                                         *filetree-config-highlight.fi_key_perm*
 highlight.fi_key_perm~
   `table`
   Highlight for the key `perm` in |filetree-file-info-view|.
   (default: `highlight.fi_key_path`)
 
+                                      *filetree-config-highlight.fi_key_created*
 highlight.fi_key_created~
   `table`
   Highlight for the key `created` in |filetree-file-info-view|.
   (default: `highlight.fi_key_path`)
 
+                                     *filetree-config-highlight.fi_key_modified*
 highlight.fi_key_modified~
   `table`
   Highlight for the key `modified` in |filetree-file-info-view|.
   (default: `highlight.fi_key_path`)
 
+                                     *filetree-config-highlight.fi_key_readable*
 highlight.fi_key_readable~
   `table`
   Highlight for the key `readable` in |filetree-file-info-view|.
   (default: `highlight.fi_key_path`)
 
+                                     *filetree-config-highlight.fi_key_writable*
 highlight.fi_key_writable~
   `table`
   Highlight for the key `writable` in |filetree-file-info-view|.
   (default: `highlight.fi_key_path`)
 
+                                         *filetree-config-highlight.fi_key_link*
 highlight.fi_key_link~
   `table`
   Highlight for the key `link` in |filetree-file-info-view|.
   (default: `highlight.fi_key_path`)
 
+                                             *filetree-config-highlight.fi_path*
 highlight.fi_path~
   `table`
   Highlight for `path` in |filetree-file-info-view|.
   (default: `{ctermfg = "white"}`)
 
+                                             *filetree-config-highlight.fi_name*
 highlight.fi_name~
   `table`
   Highlight for `name` in |filetree-file-info-view|.
   (default: `highlight.fi_path`)
 
+                                             *filetree-config-highlight.fi_type*
 highlight.fi_type~
   `table`
   Highlight for `type` in |filetree-file-info-view|.
   (default: `highlight.fi_path`)
 
+                                             *filetree-config-highlight.fi_size*
 highlight.fi_size~
   `table`
   Highlight for `size` in |filetree-file-info-view|.
   (default: `highlight.fi_path`)
 
+                                             *filetree-config-highlight.fi_perm*
 highlight.fi_perm~
   `table`
   Highlight for `perm` in |filetree-file-info-view|.
   (default: `highlight.fi_path`)
 
+                                          *filetree-config-highlight.fi_created*
 highlight.fi_created~
   `table`
   Highlight for `created` in |filetree-file-info-view|.
   (default: `highlight.fi_path`)
 
+                                         *filetree-config-highlight.fi_modified*
 highlight.fi_modified~
   `table`
   Highlight for `modified` in |filetree-file-info-view|.
   (default: `highlight.fi_path`)
 
+                                         *filetree-config-highlight.fi_readable*
 highlight.fi_readable~
   `table`
   Highlight for `readable` in |filetree-file-info-view|.
   (default: `highlight.fi_path`)
 
+                                         *filetree-config-highlight.fi_writable*
 highlight.fi_writable~
   `table`
   Highlight for `writable` in |filetree-file-info-view|.
   (default: `highlight.fi_path`)
 
+                                             *filetree-config-highlight.fi_link*
 highlight.fi_link~
   `table`
   Highlight for `link` in |filetree-file-info-view|.
   (default: `highlight.fi_path`)
 
+                                                          *filetree-config-view*
 view~
   `table`
   Table with view options.
   (default: {})
 
+                                                 *filetree-config-view.position*
 view.position~
   `string`
   Position of the tree window.
   Valid values are: "left", "right", "bottom", "top"
   (default: "left")
 
+                                                    *filetree-config-view.width*
 view.width~
   `number`
   Width of the tree window.
   (default: 30)
 
+                                                   *filetree-config-view.height*
 view.height~
   `number`
   Height of the tree window.
   (default: 30)
 
+                                                   *filetree-config-view.indent*
 view.indent~
   `number`
   Number of spaces to indent.
   (default: 2)
 
+                                               *filetree-config-view.line_width*
 view.line_width~
   `number`
   Maximum width of a line.
   Interpreted as (width - line_width), where width is the tree window width.
   (default: 6)
 
+                                           *filetree-config-view.show_dot_files*
 view.show_dot_files~
   `boolean`
   Show dot files (aka hidden files) in file tree.
   (default: false)
 
+                                          *filetree-config-view.render_callback*
 view.render_callback~
   `function`|`nil`
   Function to call when a node needs to render.
   It takes one parameter, |filetree-node|.
   (default: nil)
 
+                                           *filetree-config-view.indent_markers*
 view.indent_markers~
  `table`
  Options for indenting markers in file tree.
  (default: {})
 
+                                    *filetree-config-view.indent_markers.enable*
 view.indent_markers.enable~
   `boolean`
   Enable indent markers.
   (default: false)
 
+                                        *filetree-config-view.indent_markers.hl*
 view.indent_markers.hl~
   `table`|`string`
   Highlight to use when rendering indent.
@@ -354,22 +391,26 @@ view.indent_markers.hl~
     - `ns`     `number` Highlight namespace to use.
     - `group`  `string` Highlight group to use.
 
+                                   *filetree-config-view.indent_markers.symbols*
 view.indent_markers.symbols~
   `table`
   Table of symbols to use when indenting markers.
   Each entry must be a string with the symbol.
   (default: {})
 
+                              *filetree-config-view.indent_markers.symbols.edge*
 view.indent_markers.symbols.edge~
   `string`
   Edge of a marker.
   (default: "│")
 
+                            *filetree-config-view.indent_markers.symbols.corner*
 view.indent_markers.symbols.corner~
   `string`
   Corner of a marker.
   (default: "└")
 
+                                             *filetree-config-view.file_symbols*
 view.file_symbols~
   `table`
   Table of symbols for diffrent file types.
@@ -381,56 +422,67 @@ view.file_symbols~
   If entry is a string then the file symbol is the string.
   (default: {})
 
+                                         *filetree-config-view.file_symbols.dir*
 view.file_symbols.dir~
   `table`|`string`
   Symbol for directory.
   (default: `{symbol = "", hlg = "filetree_dir"}`)
 
+                                *filetree-config-view.file_symbols.dir_expanded*
 view.file_symbols.dir_expanded~
   `table`|`string`
   Symbol for expanded directory.
   (default: `{symbol = "", hlg = "filetree_dir_expanded"}`)
 
+                                    *filetree-config-view.file_symbols.link_dir*
 view.file_symbols.link_dir~
   `table`|`string`
   Symbol for directory symlink.
   (default: `view.file_symbols.dir`)
 
+                           *filetree-config-view.file_symbols.link_dir_expanded*
 view.file_symbols.link_dir_expanded~
   `table`|`string`
   Symbol for expanded directory symlink.
   (default: `view.file_symbols.dir_expanded`)
 
+                                        *filetree-config-view.file_symbols.file*
 view.file_symbols.file~
   `table`|`string`
   Symbol for file.
   (default: `{symbol = "", hlg = "filetree_file"}`)
 
+                                        *filetree-config-view.file_symbols.link*
 view.file_symbols.link~
   `table`|`string`
   Symbol for symlink file.
   (default: `view.file_symbols.file`)
 
+                                       *filetree-config-view.file_symbols.block*
 view.file_symbols.block~
   `table`|`string`
   Symbol for block device file.
   (default: `view.file_symbols.file`)
 
+                                        *filetree-config-view.file_symbols.char*
 view.file_symbols.char~
   `table`|`string`
   Symbol for char device file.
   (default: `view.file_symbols.file`)
 
+                                      *filetree-config-view.file_symbols.socket*
 view.file_symbols.socket~
   `table`|`string`
   Symbol for socket file.
   (default: `view.file_symbols.file`)
 
+                                        *filetree-config-view.file_symbols.fifo*
 view.file_symbols.fifo~
   `table`|`string`
   Symbol for fifo file.
   (default: `view.file_symbols.file`)
 
+                                               *filetree-config-view.file_names*
 view.file_names~
   `table`
   Table of information on how a file name is displayed.
@@ -441,56 +493,67 @@ view.file_names~
     - `hlg`(optional)     `string` Highlight group to use.
   (default: {})
 
-view.file_names.dir~
+                                           *filetree-config-view.file_names.dir*
+view.file_names.dir ~
   `table`
   Information on how a directory name is displayed.
   (default: `{suffix = "/", hlg = "filetree_dir"}`)
   
+                                  *filetree-config-view.file_names.dir_expanded*
 view.file_names.dir_expanded~
   `table`
   Information on how a expanded directory name is displayed.
   (default: `{suffix = "/", hlg = "filetree_dir_expanded"}`)
  
+                                      *filetree-config-view.file_names.link_dir*
 view.file_names.link_dir~
   `table`
   Information on how a directory symlink name is displayed.
   (default: `viem.file_names.dir`)
   
+                             *filetree-config-view.file_names.link_dir_expanded*
 view.file_names.link_dir_expanded~
   `table`
   Information on how a expanded directory symlink name is displayed.
   (default: `view.file_names.dir_expanded`)
   
+                                          *filetree-config-view.file_names.file*
 view.file_names.file~
   `table`
   Information on how a file name is displayed.
   (default: `{suffix = "", hlg = "filetree_file"}`)
 
+                                          *filetree-config-view.file_names.link*
 view.file_names.link~
   `table`
   Information on how a symlink file name is displayed.
   (default: `{suffix = "@", hlg = "filetree_file"}`)
 
+                                         *filetree-config-view.file_names.block*
 view.file_names.block~
   `table`
   Information on how a block device file name is displayed.
   (default: `{suffix = "#", hlg = "filetree_file"}`)
 
+                                          *filetree-config-view.file_names.char*
 view.file_names.char~
   `table`
   Information on how a char device file name is displayed.
   (default: `{suffix = "%", hlg = "filetree_file"}`)
 
+                                        *filetree-config-view.file_names.socket*
 view.file_names.socket~
   `table`
   Information on how a socket file name is displayed.
   (default: `{suffix = "=", hlg = "filetree_file"}`)
 
+                                          *filetree-config-view.file_names.fifo*
 view.file_names.fifo~
   `table`
   Information on how a fifo file name is displayed.
   (default: `{suffix = "|", hlg = "filetree_file"}`)
 
+                                                *filetree-config-view.file_exts*
 view.file_exts~
   `table`
   Table of symbols to display at the end of a line.
@@ -500,71 +563,85 @@ view.file_exts~
     - `hlg`(optional)     `string` Highlight group to use.
   (default: {})
 
+                                            *filetree-config-view.file_exts.dir*
 view.file_exts.dir~
   `table`|`nil`
   Symbol for a directory to display at end of line.
   (default: nil)
 
+                                   *filetree-config-view.file_exts.dir_expanded*
 view.file_exts.dir_expanded~
   `table`|`nil`
   Symbol for a expanded directory to display at end of line.
   (default: nil)
 
+                                       *filetree-config-view.file_exts.link_dir*
 view.file_exts.link_dir~
   `table`|`nil`
   Symbol for a directory symlink to display at end of line.
   (default: `view.file_exts.dir`)
 
+                              *filetree-config-view.file_exts.link_dir_expanded*
 view.file_exts.link_dir_expanded~
   `table`|`nil`
   Symbol for a expanded directory symlink to display at end of line.
   (default: `view.file_exts.dir_expanded`)
 
+                                           *filetree-config-view.file_exts.file*
 view.file_exts.file~
   `table`|`nil`
   Symbol for a file to display at the end of line.
   (default: nil)
 
+                                           *filetree-config-view.file_exts.link*
 view.file_exts.link~
   `table`|`nil`
   Symbol for a symlink file to display at the end of line.
   (default: `view.file_exts.file`)
 
+                                          *filetree-config-view.file_exts.block*
 view.file_exts.block~
   `table`|`nil`
   Symbol for a block device file to display at the end of line.
   (default: `view.file_exts.file`)
 
+                                           *filetree-config-view.file_exts.char*
 view.file_exts.char~
   `table`|`nil`
   Symbol for a char device file to display at the end of line.
   (default: `view.file_exts.file`)
 
+                                         *filetree-config-view.file_exts.socket*
 view.file_exts.socket~
   `table`|`nil`
   Symbol for a socket file to display at the end of line.
   (default: `view.file_exts.file`)
 
+                                           *filetree-config-view.file_exts.fifo*
 view.file_exts.fifo~
   `table`|`nil`
   Symbol for a fifo file to display at the end of line.
   (default: `view.file_exts.file`)
 
+                                                       *filetree-config-mapping*
 mapping~
   `table`
   Table of options used for key mappings.
   (default: {})
 
+                                           *filetree-config-mapping.wrap_cursor*
 mapping.wrap_cursor~
   `boolean`
   Wraps the cursor.
   (default: false)
 
+                                        *filetree-config-mapping.close_children*
 mapping.close_children~
   `boolean`
   Close sub directories when closing a directory.
   (default: true)
 
+                                       *filetree-config-mapping.yank_file_names*
 mapping.yank_file_names~
   `string`
   Save yanked files file names to yank reigster.
@@ -574,16 +651,19 @@ mapping.yank_file_names~
     - "name"  Save the file name.
   (default: "path")
 
+                                               *filetree-config-mapping.keymaps*
 mapping.keymaps~
   `table`
   Table of key mappings.
   See |filetree-mappings|.
 
+                                                *filetree-config-file_info_view*
 file_info_view~
   `table`
   Table of options for the file info view.
   (default: {})
 
+                                        *filetree-config-file_info_view.content*
 file_info_view.content~
   `table`
   List of things to display in the info view.
@@ -626,16 +706,19 @@ file_info_view.content~
     - `resolved`  `boolean`(optional) use the resolved file path.
   (default: `{...}`)
 
+                                                  *filetree-config-file_preview*
 file_preview~
   `table`
   Table of options to use for file preview.
   (default: {})
 
+                                      *filetree-config-file_preview.quit_on_esc*
 file_preview.quit_on_esc~
   `boolean`
   Quit the preview when pressing <Escape>.
   (default: true)
 
+                                             *filetree-config-file_preview.type*
 file_preview.type~
   `string`
   Type of window.
@@ -645,55 +728,66 @@ file_preview.type~
     - "normal"  For a non-floating window.
   (default: "float")
 
+                                         *filetree-config-file_preview.relative*
 file_preview.relative~
   `string`
   See: |nvim_open_win()|.
   (default: "editor")
 	
+                                         *filetree-config-file_preview.absolute*
 file_preview.absolute~
   `boolean`
   Place window at absolute values if true. Otherwise
   place window at percent of values. (TODO)
   (default: false)
 
+                                            *filetree-config-file_preview.width*
 file_preview.width~
   `number`
   Width of preview window.
   (default: 0.9)
 
+                                           *filetree-config-file_preview.height*
 file_preview.height~
   `number`
   Height of preview window.
   (default: 0.7)
 
+                                              *filetree-config-file_preview.row*
 file_preview.row~
   `number`
   Row position of preview window.
 
+                                              *filetree-config-file_preview.col*
 file_preview.col~
   `number`
   Column position of preview window.
 
+                                           *filetree-config-file_preview.border*
 file_preview.border~
   `string`
   See: |nvim_open_win()|.
   (default: "single")
 
+                                           *filetree-config-file_preview.number*
 file_preview.number~
   `boolean`
   Enable 'number' option for preview window.
   (default: true)
 
+                                   *filetree-config-file_preview.relativenumber*
 file_preview.relativenumber~
   `boolean`
   Enable 'relativenumber' option for preview window.
   (default: true)
 
+                                                       *filetree-config-filters*
 filters~
   `table`
   Table of options for filtering files from directories.
   (default: {})
 
+                                              *filetree-config-filters.callback*
 filters.callback~
   `function`|`nil`
   Function to call when filtering files.
@@ -701,31 +795,37 @@ filters.callback~
     - `files`  `table` Files to filter.
   (default: nil)
 
+                                               *filetree-config-filters.exclude*
 filters.exclude~
   `table`
   Options for excluding files.
   (default: {})
 
+                                     *filetree-config-filters.exclude.dot_files*
 filters.exclude.dot_files~
   `boolean`
   Exclude dot files (aka hidden files) from directory.
   (default: false)
 
+                                       *filetree-config-filters.exclude.pattern*
 filters.pattern~
   `string`
   Exclude files that matches the pattern (|regular-expression|).
   (default: "")
 
+                                                       *filetree-config-actions*
 actions~
   `table`
   Table of options for diffrent actions.
   (default: {})
 
+                                            *filetree-config-actions.sort_nodes*
 actions.sort_nodes~
   `table`
   Options to use when sorting nodes.
   (default: {})
 
+                                   *filetree-config-actions.sort_nodes.callback*
 actions.sort_nodes.callback~
   `function`|`nil`
   Callback for sorting nodes.
@@ -733,6 +833,7 @@ actions.sort_nodes.callback~
     - `nodes`  Nodes to sort.
   (default: nil)
 
+                                     *filetree-config-actions.sort_nodes.method*
 actions.sort_nodes.method~
   `string`
   Method to use when sorting nodes.
@@ -745,6 +846,7 @@ actions.sort_nodes.method~
     - "modified"   Sort by file last modified.
   (default: "name")
 
+                                *filetree-config-actions.sort_nodes.directories*
 actions.sort_nodes.directories~
   `string`
   How to sort directories.
@@ -754,16 +856,19 @@ actions.sort_nodes.directories~
     - "bottom"  Place directories at bottom of the tree.
   (default: "top")
 
+                                    *filetree-config-actions.sort_nodes.reverse*
 actions.sort_nodes.reverse~
   `boolean`
   Reverse node order.
   (default: false)
 
+                                          *filetree-config-actions.root_changed*
 actions.root_changed~
   `table`
   Options to use when changing root.
   (default: {})
 
+                                 *filetree-config-actions.root_changed.callback*
 actions.root_changed.callback~
   `function`|`nil`
   Function to call when root was changed.
@@ -771,16 +876,19 @@ actions.root_changed.callback~
     - `tree`  The new root tree.
   (default: nil)
 
+                               *filetree-config-actions.root_changed.change_cwd*
 actions.root_changed.change_cwd~
   `boolean`
   Changes the current working directory when changing root tree.
   (default: false)
 
+                                             *filetree-config-actions.open_file*
 actions.open_file~
   `table`
   Options to use when opening a file.
   (default: {})
 
+                                    *filetree-config-actions.open_file.callback*
 actions.open_file.callback~
   `function`|`nil`
   Function to call when opening a file.
@@ -788,47 +896,56 @@ actions.open_file.callback~
     - `file`  `string` File to open.
   (default: nil)
 
+                                   *filetree-config-actions.open_file.quit_tree*
 actions.open_file.quit_tree~
   `boolean`
   Quit file tree when opening a file.
   (default: false)
 
+                               *filetree-config-actions.open_file.window_picker*
 actions.open_file.window_picker~
   `table`
   Options to use when choosing a window.
   (default: {})
 
+                        *filetree-config-actions.open_file.window_picker.enable*
 actions.open_file.window_picker.enable~
   `boolean`
   Enable window picker.
   (default: true)
 
+                           *filetree-config-actions.open_file.window_picker.ids*
 actions.open_file.window_picker.ids~
   `string`
   String of chars to use for diffrent windows.
   (default: "aoeuhtns")
 
+                       *filetree-config-actions.open_file.window_picker.exclude*
 actions.open_file.window_picker.exclude~
   `table`
   Options to use when excluding buffers.
   (default: {})
 
+                  *filetree-config-actions.open_file.window_picker.exclude.self*
 actions.open_file.window_picker.exclude.self~
   `boolean`
   Exlude file tree buffer.
   (default: true)
 
+              *filetree-config-actions.open_file.window_picker.exclude.buftypes*
 actions.open_file.window_picker.exclude.buftypes~
   `table`
   List of buffer types to exclude.
   See: |'buftype'|.
   (default: `{"nofile", "help"}`)
 
+              *filetree-config-actions.open_file.window_picker.exclude.bufnames*
 actions.open_file.window_picker.exclude.bufnames~
   `table`
   List of buffer names to exclude.
   (default: {})
 
+             *filetree-config-actions.open_file.window_picker.suitable_callback*
 actions.open_file.window_picker.suitable_callback~
   `function`|`nil`
   Function to check if a buffer should be listed when picking window.
@@ -837,11 +954,13 @@ actions.open_file.window_picker.suitable_callback~
     - `buf`  `number` Buffer to test.
   (default: nil)
 
+                                             *filetree-config-actions.read_file*
 actions.read_file~
   `table`
   Options to use when reading a file.
   (default: {})
 
+                                    *filetree-config-actions.read_file.callback*
 actions.read_file.callback~
   `function`|`nil`
   Function to call when reading a file.
@@ -850,11 +969,13 @@ actions.read_file.callback~
     - `file`  File path to read.
   (default: nil)
 
+                                        *filetree-config-actions.read_directory*
 actions.read_directory~
   `table`
   Options to use when reading a directory.
   (default: {})
 
+                               *filetree-config-actions.read_directory.callback*
 actions.read_directory.callback~
   `function`|`nil`
   Function to call when reading a directory.
@@ -867,11 +988,13 @@ actions.read_directory.callback~
     - `file`  File path to read.
   (default: nil)
 
+                                             *filetree-config-actions.make_file*
 actions.make_file~
   `table`
   Options to use when creating a file.
   (default: {})
 
+                                    *filetree-config-actions.make_file.callback*
 actions.make_file.callback~
   `function`|`nil`
   Function to call to create a file.
@@ -879,11 +1002,13 @@ actions.make_file.callback~
     - `file`  `string` File to create.
   (default: nil)
 
+                                        *filetree-config-actions.make_directory*
 actions.make_directory~
   `table`
   Options to use when creating a directory.
   (default: {})
 
+                               *filetree-config-actions.make_directory.callback*
 actions.make_directory.callback~
   `function`|`nil`
   Function to call to create a directory.
@@ -891,11 +1016,13 @@ actions.make_directory.callback~
     - `path`  `string` Directory path to create.
   (default: nil)
 
+                                             *filetree-config-actions.copy_file*
 actions.copy_file~
   `table`
   Options to use when copying a file.
   (default: {})
 
+                                    *filetree-config-actions.copy_file.callback*
 actions.copy_file.callback~
   `function`|`nil`
   Function to call to copy a file.
@@ -904,11 +1031,13 @@ actions.copy_file.callback~
     - `dest`  `string` Destination for the new file.
   (default: nil)
 
+                                             *filetree-config-actions.move_file*
 actions.move_file~
   `table`
   Options to use when moving a file.
   (default: {})
 
+                                    *filetree-config-actions.move_file.callback*
 actions.move_file.callback~
   `function`|`nil`
   Function to call to move a file.
@@ -917,11 +1046,13 @@ actions.move_file.callback~
     - `dest`  `string` New file path.
   (default: nil)
 
+                                           *filetree-config-actions.remove_file*
 actions.remove_file~
   `table`
   Options to use when removing a file.
   (default: {})
 
+                                  *filetree-config-actions.remove_file.callback*
 actions.remove_file.callback~
   `function`|`nil`
   Function to call to remove a file.
