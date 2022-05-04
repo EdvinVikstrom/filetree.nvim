@@ -12,7 +12,7 @@ Requires Neovim 0.7+
 * Preview files
 * Much customization
 
-### Example conifg file
+### Example config file
 ```
 local FileTree = require("filetree")
 local Mapping = FileTree.Mapping
